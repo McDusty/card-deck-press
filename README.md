@@ -2,6 +2,10 @@
 
 ![](https://raw.githubusercontent.com/PIWEEK/cardforge/d25f9f0d062c040b668a82ac0256192b5ad3080e/public/images/main-logo.svg)
 
+## Development work
+
+The `codex/cardforge-import-print` branch develops CSV imports and front-only output. Requirements are in [the PRD](docs/cardforge-prd.md); verified findings and remaining checks are in [the feasibility plan](docs/feasibility.md). The installation URL below is the upstream release, not this development branch.
+
 ## Introduction
 
 The Cardforge plugin for [Penpot](penpot.app) allows you to create decks for board games. You only have to design the front and the back of a card, create a list of all the cards that you want, and the plugin will generate an output to print the cards or even use on digital game systems.
