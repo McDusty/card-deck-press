@@ -17,11 +17,15 @@ This document tracks evidence needed before implementing the [product requiremen
 
 ## Tooling findings
 
-The installed plugin types are version 1.0.0. They describe library components, plugin metadata, and shape exports, but do not declare `Text.textBounds` or `waitForLayoutUpdate`.
+**Dependency maintenance complete:** Penpot plugin types are pinned to 1.4.2, TypeScript to 5.9.3, Vite to 7.3.6, and vite-live-preview to 0.4.0. The updated compiler and production build pass. Existing plugin styles remain at 1.0.0.
 
-Current official documentation describes both rendered text bounds and waiting for pending layout updates. Select and pin a compatible API-types version, establish the minimum supported Penpot runtime, and verify existing Cardforge behaviour before using these methods. [Text API](https://doc.plugins.penpot.app/interfaces/Text)
+The preview package now uses a Vite plugin rather than a standalone command. Configuration registers the plugin, and `npm run dev` invokes `vite build --watch`. Configuration loading and CLI resolution pass without opening a server. ES2020 remains the explicit JavaScript build target. [Preview package documentation](https://github.com/Shakeskeyboarde/vite-live-preview)
 
-The unchanged dependency audit reports six vulnerable packages: one moderate and five high. They are in the development-tool dependency tree: esbuild, nanoid, postcss, rollup, vite, and ws. Review compatible upgrades before starting a live preview; do not apply forced major updates without checking the preview integration. This finding is not a demonstrated vulnerability in generated cards.
+Build tooling requires Node `^20.19.0 || >=22.12.0`; these checks used Node 25.9.0. This is the build-tool requirement, not the minimum supported Penpot version.
+
+The baseline dependency audit reported six vulnerable packages: one moderate and five high, in the development-tool dependency tree. After the upgrades, installation audits report zero known vulnerabilities. This is an audit result for the resolved dependency tree, not a guarantee that the plugin is free of security defects.
+
+**Text API gap remains:** Published plugin types 1.4.2 still do not declare `Text.textBounds` or `waitForLayoutUpdate`, although current online documentation describes both. Confirm actual runtime availability and establish the minimum supported Penpot version during the text probe. Do not claim the dependency update alone enables those methods or cast away a missing runtime capability. [Text API](https://doc.plugins.penpot.app/interfaces/Text)
 
 ## Artwork matching
 
@@ -41,7 +45,7 @@ The unchanged dependency audit reports six vulnerable packages: one moderate and
 
 **Pass:** Valid text preserves the design. Overflow identifies the card and field. A timeout or unavailable measurement is unverified and blocks publication. No automatic shrinking occurs.
 
-**Status:** Requires API-types compatibility work and live verification.
+**Status:** Published types updated. Measurement-helper declarations and runtime compatibility still require verification.
 
 ## Physical sizing and downloads
 
@@ -84,4 +88,4 @@ A 52-record deck with quantity 1 requires nine six-front pages or six nine-front
 
 Measure the PRD's proposed record, copy, page, raster-size, and download limits after the live export and text tests work. Record the tested browser, Penpot version, card sizes, elapsed time, memory behaviour, and cancellation response. Do not label proposed limits as measured support.
 
-Resolve the tooling findings first, then run artwork, text, export, and recovery probes. Only mark a gate passed when its output or runtime behaviour has been observed. Failed gates require a documented design change before full feature implementation.
+Dependency maintenance is complete. Run artwork, text, export, and recovery probes next, resolving the text API gap before claiming overflow detection. Only mark a gate passed when its output or runtime behaviour has been observed. Failed gates require a documented design change before full feature implementation.

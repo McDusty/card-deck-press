@@ -6,6 +6,8 @@
 
 The `codex/cardforge-import-print` branch develops CSV imports and front-only output. Requirements are in [the PRD](docs/cardforge-prd.md); verified findings and remaining checks are in [the feasibility plan](docs/feasibility.md). The installation URL below is the upstream release, not this development branch.
 
+Build tooling requires Node 20.19+ on the 20.x line, or Node 22.12+ on later lines. Install locked dependencies with `npm ci` and build with `npm run build`. Before starting a preview, check whether Tilt manages this service. `npm run dev` builds in watch mode and starts the live preview on port 4400; a normal build does not start a server.
+
 ## Introduction
 
 The Cardforge plugin for [Penpot](penpot.app) allows you to create decks for board games. You only have to design the front and the back of a card, create a list of all the cards that you want, and the plugin will generate an output to print the cards or even use on digital game systems.
