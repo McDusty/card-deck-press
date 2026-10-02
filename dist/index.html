@@ -393,8 +393,8 @@ Second line",dragon.png
               <p>Update your spreadsheet, keep the same IDs, and upload a new CSV. <strong>Apply replaces the whole list</strong>: cards absent from the new file are removed from the list.</p>
               <p>Existing generated boards stay in place after import. The <strong>out-of-date</strong> message means you need to generate cards again in Export.</p>
               <ul>
-                <li><strong>Export CSV:</strong> save the current card data for backup and reimporting. Cards without IDs receive generated IDs in the export.</li>
-                <li><strong>Export for spreadsheets:</strong> save a viewing copy with formula-like values treated as text. This adds leading tabs to those values. Use the original Export CSV for reimporting; spreadsheet applications may handle text protection differently.</li>
+                <li><strong>Export CSV:</strong> keeps your card text unchanged. Use this for backups, editing, and importing back into the plugin. Cards without IDs receive generated IDs in the export.</li>
+                <li><strong>Export for spreadsheets:</strong> also downloads a CSV, but adds a leading tab to values a spreadsheet might interpret as formulas, such as <code>+2 healing</code>. Use this as a viewing copy. The added tabs change those values, so use <strong>Export CSV</strong> for reimporting. Spreadsheet applications may handle this protection differently.</li>
                 <li><strong>Restore previous import:</strong> restore one saved snapshot of the card data, mappings, and output settings.</li>
               </ul>
               <p>Restore does not undo template or artwork edits and does not regenerate output. Review the restored data, then generate cards again in Export. A later import replaces the stored snapshot.</p>

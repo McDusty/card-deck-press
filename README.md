@@ -78,8 +78,8 @@ This example expects a text layer named `#name` and an image placeholder named `
 - **Import CSV:** map columns to Card ID, Quantity, template fields, or Ignore. Matching headers map automatically. Review the preview and added, changed, and removed records before applying.
 - **Updates:** each import replaces the complete card list. Keep IDs stable between imports, then generate cards again to update output. Existing output remains until a replacement succeeds.
 - **Quantity:** use whole numbers from 0 to 100. Zero excludes the card. Print sheets repeat copies; single-front, Standard, and Tabletop layouts include each nonzero design once.
-- **Export CSV:** download a lossless backup for editing and reimporting. Ignored source columns are not retained.
-- **Export for spreadsheets:** download a separate viewing copy that protects formula-like text with leading tabs. Use the raw CSV for lossless reimports; spreadsheet handling can vary.
+- **Export CSV:** keeps your card text unchanged. Use this for backups, editing, and importing back into the plugin. Ignored source columns are not retained.
+- **Export for spreadsheets:** also downloads a CSV, but adds a leading tab to values a spreadsheet might interpret as formulas, such as `+2 healing`. Use this as a viewing copy. The added tabs change those values, so use **Export CSV** for reimporting. Spreadsheet applications may handle this protection differently.
 - **Restore previous import:** restore one saved card-list, mapping, and output-settings snapshot. This does not restore artwork or template edits, or regenerate output.
 
 Quoted commas, escaped quotes, Unicode, and multiline text are supported. Limits are **2 MiB per CSV, 100 columns, 500 records, and 1,000 printed copies**.
