@@ -113,6 +113,7 @@
         <div id="forge-entry" class="forge-entry" role="group" aria-label="Card actions">
           <button id="upload-csv" class="btn-primary" type="button">IMPORT CSV</button>
           <button id="correct-poker-size" class="btn-primary hidden" type="button">CORRECT POKER SIZE</button>
+          <button id="refresh-artwork" type="button">Refresh Artwork</button>
           <button id="add-card" class="btn-primary" type="button">ADD CARD</button>
         </div>
         <div id="template-size-panel" class="template-size-panel">
@@ -365,7 +366,9 @@ Second line",dragon.png
                 <li>Reopen Card Forge Upgraded. <strong>Edit Deck</strong> now shows a column with your chosen name, such as <strong>art</strong> or <strong>illustration</strong>.</li>
               </ol>
               <h3>Add images manually</h3>
-              <p>In <strong>Edit Deck</strong>, click a card's image cell and choose a file. Repeat for each card that needs a different image. Open <strong>Export</strong> and click <strong>Generate Cards</strong> to use your changes.</p>
+              <p>In <strong>Edit Deck</strong>, each image cell lets you type an exact Artwork image name or select an image from <strong>Choose from Artwork</strong>. Press Enter or leave the name field to match it. Use a full path to distinguish duplicate names, such as <code>Artwork/creatures/dragon.png</code>.</p>
+              <p>Click <strong>Upload</strong> to add a new image. It is saved in Artwork with its filename and assigned to this card, ready to reuse in other rows or CSV imports. <strong>Clear</strong> removes the image from this card without deleting it from Artwork.</p>
+              <p>After adding or renaming images directly in Penpot, click <strong>Refresh Artwork</strong> to update the choices. Missing or ambiguous names show an error; resolve them before generating fronts. Open <strong>Export</strong> and click <strong>Generate Cards</strong> to use your changes.</p>
               <h3>Match images from CSV</h3>
               <p>Place your source images in the <strong>Artwork</strong> frame as rectangles with image fills. Name each image rectangle with its exact filename, such as <code>healing.png</code>.</p>
               <p>Use an <code>art</code> column in your CSV. It maps automatically to the template's <code>#art</code> field. For example:</p>

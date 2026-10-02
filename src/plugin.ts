@@ -7,7 +7,7 @@ import { generateFrontOutput, exportFrontSheets } from './front-output';
 import { correctPokerTemplates, getTemplateSizeInfo } from './template-size';
 import { CsvImporter, validateImportedFields, readDeck, importFields } from './csv-import';
 import { cardsForOutput } from './deck-data';
-import { createArtworkBoard, getArtworkBoard } from './artwork';
+import { createArtworkBoard, getArtworkBoard, listArtwork, resolveArtwork } from './artwork';
 import { DeckSession } from './deck-session';
 import type { PageBinding } from './deck-session';
 import { ImageTargets } from './image-targets';
@@ -88,8 +88,35 @@ function loadCardFields() {
 
     const assetsUrl = "https://design.penpot.app/assets/by-file-media-id/";
     sendUi({ "type": "CARD_FIELDS", "data": { fields: fields, assetsUrl: assetsUrl } });
+    loadArtwork();
 }
 
+function loadArtwork() {
+    sendUi({ type: 'ARTWORK_LIST', data: penpot.currentPage ? listArtwork(penpot.currentPage) : [] });
+}
+
+function selectArtwork(value: unknown) {
+    let target: ImageTarget | undefined;
+    try {
+        if (!value || typeof value !== 'object') throw new Error('Choose an Artwork image.');
+        const input = value as Record<string, unknown>;
+        if (typeof input.rowId !== 'string' || typeof input.name !== 'string' || typeof input.uploadId !== 'string' || typeof input.value !== 'string') {
+            throw new Error('Choose an Artwork image.');
+        }
+        target = { rowId: input.rowId, name: input.name, uploadId: input.uploadId };
+        if (!deckSession.hasRow(target.rowId)) throw new Error('This card was removed.');
+        imageTargets.start(target);
+        const page = penpot.currentPage;
+        if (!page || !importFields(page).some(field => field.name === target!.name && field.type === 'image')) {
+            throw new Error('The template image field changed. Reopen the plugin and choose the image again.');
+        }
+        const reference = resolveArtwork(listArtwork(page), input.value);
+        loadArtwork();
+        sendUi({ type: 'ARTWORK_SELECTED', data: { ...target, reference } });
+    } catch (error) {
+        sendUi({ type: 'IMAGE_ERROR', data: { ...target, message: error instanceof Error ? error.message : 'Could not choose Artwork.' } });
+    } finally { if (target) imageTargets.finish(target); }
+}
 
 function createDeck(message: DeckEvent) {
     if (penpot.currentPage) {
@@ -175,6 +202,7 @@ async function createImage(value: unknown, context: PageBinding) {
             board.appendChild(shape);
             shape.x = board.x + (board.children.length - 1) * 300;
             shape.y = board.y;
+            loadArtwork();
             sendUi({ type: 'IMAGE_CREATED', data: { ...target, id: media.id, imageId: shape.id } }, context);
         } catch (error) { shape.remove(); throw error; }
     } catch (error) {
@@ -204,8 +232,10 @@ async function uploadArtwork(value: unknown, context: PageBinding) {
             uploaded++;
             sendUi({ type: 'ARTWORK_PROGRESS', data: { uploaded, total: files.length } }, context);
         }
+        loadArtwork();
         sendUi({ type: 'ARTWORK_READY', data: { uploaded } }, context);
     } catch (error) {
+        if (deckSession.matches(context)) loadArtwork();
         sendUi({ type: 'CSV_ERROR', data: { message: `${uploaded} images uploaded. ${error instanceof Error ? error.message : 'Artwork upload failed.'}` } }, context);
     }
 }
@@ -216,7 +246,7 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
         if (deckSession.context.pageId !== (penpot.currentPage?.id ?? null)) deckSession.changePage();
         loadPage(); return;
     }
-    const mutating = ['create-deck', 'save-cards-data', 'create-image-data', 'upload-artwork', 'forge-cards', 'export-front-pdf', 'correct-poker-size', 'csv-preview', 'csv-apply', 'csv-restore', 'csv-export'];
+    const mutating = ['create-deck', 'save-cards-data', 'create-image-data', 'select-artwork', 'upload-artwork', 'forge-cards', 'export-front-pdf', 'correct-poker-size', 'csv-preview', 'csv-apply', 'csv-restore', 'csv-export'];
     if (mutating.includes(message.type)) {
         try { deckSession.require(message); }
         catch (error) {
@@ -267,6 +297,10 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
         loadCardFields();
     } else if (message.type === "create-image-data") {
         void createImage(message.data, deckSession.context);
+    } else if (message.type === 'select-artwork') {
+        selectArtwork(message.data);
+    } else if (message.type === 'load-artwork') {
+        loadArtwork();
     } else if (message.type === "forge-cards") {
         try {
             if (pdfExporting) throw new Error('Wait for the PDF download to finish.');

@@ -35,7 +35,7 @@ See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/
 | Interface | Compact tabs, common actions at the top, simpler buttons, fewer decorative images, and helpful empty states. |
 | Deck data | CSV import with column mapping, validation, preview, and repeat imports using stable card IDs. Google Sheets works through downloaded CSV files. |
 | Card quantities | A Quantity field lets one Healing row produce ten printed copies. CSV imports recognize the `quantity` header. |
-| Artwork | A visible Artwork frame stores reusable images. Batch uploads preserve filenames, which CSV image fields match by name or path. |
+| Artwork | A visible Artwork frame stores reusable images. Card rows accept image names or selections from Artwork. Uploads preserve filenames for reuse and CSV matching. |
 | Card sizes | Corrected Poker and Tarot dimensions, 11 rectangular presets, custom sizes, and a Pixels / Inches / Millimeters selector. |
 | Output layouts | Fronts only or backs only, as individual cards or six-up and nine-up sheets. Original Standard, fold-over Print and Play, and Tabletop layouts remain available. |
 | Printing | US Letter by default for the new sheet layouts, optional A4, cards placed edge to edge, single shared cut lines, and physically sized PDF downloads. |
@@ -97,6 +97,17 @@ For **Google Sheets**, download the sheet as CSV and import that file. Live Goog
 Use a path such as `Artwork/creatures/dragon.png` to distinguish duplicate names. Missing or ambiguous matches block the import. A blank mapped image cell clears that field; an unmapped field keeps its template content.
 
 Batch uploads support **100 images totaling 32 MiB**. Replace the fill on an existing Artwork rectangle and regenerate to use the updated image. Legacy `_Images` storage remains compatible and becomes visible when reused for uploads.
+
+### Choose an image in a card row
+
+In **Edit Deck**, each image field offers:
+
+- **Artwork image name:** type an exact filename or path, then press Enter or leave the field to match it.
+- **Choose from Artwork:** select an image already stored on the current page. Duplicate filenames use full paths.
+- **Upload:** add a new image to Artwork and assign it to this card. It keeps its filename and can be reused in other rows or CSV imports.
+- **Clear:** remove the card's image without deleting the source from Artwork.
+
+After adding or renaming images directly in Penpot, click **Refresh Artwork** to update the list. Missing or ambiguous names show an error and must be resolved before generating fronts.
 
 Matching currently supports raster image rectangles on the current page. Shared Penpot libraries and complex vector components are not supported.
 

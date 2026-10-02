@@ -1,6 +1,24 @@
 import type { Board, Page, Penpot, Shape } from '@penpot/plugin-types';
 
 export interface ArtworkAsset { name: string; path: string; reference: string }
+
+export function matchArtwork(assets: readonly ArtworkAsset[], value: string): ArtworkAsset[] {
+  return assets.filter(asset => asset.name === value || asset.path === value || asset.path.replace(/^Artwork\//, '') === value);
+}
+
+export function resolveArtwork(assets: readonly ArtworkAsset[], value: string): string {
+  if (!value) return '';
+  const matches = matchArtwork(assets, value);
+  if (!matches.length) throw new Error(`No Artwork image named "${value}". Check the name or upload it first.`);
+  if (matches.length > 1) throw new Error(`Multiple Artwork images named "${value}". Choose a full Artwork path.`);
+  return matches[0].reference;
+}
+
+export function artworkName(assets: readonly ArtworkAsset[], reference: string): string {
+  const asset = assets.find(item => item.reference.split('|')[0] === reference.split('|')[0]);
+  return asset ? matchArtwork(assets, asset.name).length === 1 ? asset.name : asset.path : '';
+}
+
 export const ARTWORK_OWNER = 'cardforge-artwork';
 
 export function artworkBoards(page: Page): Board[] {

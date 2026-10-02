@@ -1,6 +1,6 @@
 import type { Page, Penpot, Shape } from '@penpot/plugin-types';
 import type { CardRecord } from './output-options';
-import { listArtwork } from './artwork';
+import { listArtwork, matchArtwork } from './artwork';
 import { parseCsv, writeCsv } from './csv';
 import { cardQuantity, printedCopies } from './deck-data';
 
@@ -113,7 +113,7 @@ export class CsvImporter {
         const value = row.values[index];
         const field = fields.find(field => field.name === target);
         if (field?.type === 'image' && value) {
-          const matches = assets.filter(asset => asset.name === value || asset.path === value || asset.path.replace(/^Artwork\//, '') === value);
+          const matches = matchArtwork(assets, value);
           if (matches.length !== 1) errors.push(`Row ${row.line}, ${header}: ${matches.length ? 'multiple images named' : 'missing image'} "${value}". Use a unique name or Artwork/path.`);
           else { card[target] = matches[0].reference; artworkMatches++; }
         } else card[target] = value;

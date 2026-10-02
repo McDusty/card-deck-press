@@ -12,6 +12,12 @@ import type { PageBinding } from './deck-session';
 import { ImageTargets, assignCardImage } from './image-targets';
 import type { ImageTarget } from './image-targets';
 import { printedCopies, cardQuantity } from './deck-data';
+import { createArtworkCell } from './artwork-cell';
+import type { ArtworkCell } from './artwork-cell';
+import type { ArtworkAsset } from './artwork';
+let artworkAssets: ArtworkAsset[] = [];
+const artworkCells = new Map<string, ArtworkCell>();
+const artworkKey = (rowId: string, name: string) => JSON.stringify([rowId, name]);
 let csvMessage: ((type: string, data: unknown) => void) | undefined;
 
 import type {
@@ -50,7 +56,7 @@ function initMessageListener() {
     const message = event.data;
     if (message.type === 'PAGE_CONTEXT') {
       pageBinding = { pageId: message.pageId, session: message.session };
-      cardsData = []; rowIds = []; cardFields = []; imageTargets.clear();
+      cardsData = []; rowIds = []; cardFields = []; artworkAssets = []; artworkCells.clear(); imageTargets.clear();
       pdfOperation = null; setPdfBusy(false); invalidateOutput();
       loadCardFields(false); reloadCardEntries();
       csvMessage?.('CSV_RESET', null);
@@ -72,10 +78,20 @@ function initMessageListener() {
       loadCardFields();
     } else if (event.data.type == "IMAGE_CREATED") {
       updateImageInfo(event.data.data, event.data.data.id, event.data.data.imageId);
+    } else if (message.type === 'ARTWORK_SELECTED') {
+      updateImageReference(message.data, message.data.reference);
+    } else if (message.type === 'ARTWORK_LIST') {
+      artworkAssets = message.data as ArtworkAsset[];
+      for (const [key, cell] of artworkCells) {
+        const [rowId, name] = JSON.parse(key) as string[];
+        const card = cardsData[rowIds.indexOf(rowId)];
+        if (card) cell.refresh(artworkAssets, card[name] ?? '');
+      }
     } else if (message.type === 'IMAGE_ERROR') {
       const target = message.data as ImageTarget;
       if (target.uploadId && !imageTargets.matches(target)) return;
       imageTargets.finish(target);
+      artworkCells.get(artworkKey(target.rowId, target.name))?.error(message.data.message);
       showDeckError(message.data.message);
     } else if (message.type === 'DECK_ERROR') {
       showDeckError(message.data);
@@ -251,10 +267,24 @@ function showDeckError(message: string) {
 }
 
 function updateImageInfo(target: ImageTarget, id: string, imageId: string) {
+  updateImageReference(target, `${imageId}|${id}`);
+}
+
+function updateImageReference(target: ImageTarget, reference: string) {
   if (!imageTargets.matches(target)) return;
   imageTargets.finish(target);
-  if (!assignCardImage(cardsData, rowIds, target, `${imageId}|${id}`)) return;
+  if (!assignCardImage(cardsData, rowIds, target, reference)) return;
+  const note = document.getElementById('csv-deck-status');
+  if (note) { note.textContent = ''; note.classList.add('hidden'); }
   saveCardsData(); reloadCardEntries();
+}
+
+function chooseCardArtwork(rowId: string, session: number, name: string, value: string) {
+  if (pageBinding.session !== session || !rowIds.includes(rowId)) return;
+  const target = { rowId, name, uploadId: crypto.randomUUID() };
+  imageTargets.start(target);
+  invalidateOutput();
+  sendMessage({ type: 'select-artwork', data: { ...target, value } });
 }
 
 function loadCardsData(data: string, identities: string[]) {
@@ -330,33 +360,15 @@ function createCardEntry(num: number, cardData: CardRecord) {
 
       entry.appendChild(div);
     } else {
-      let div = document.createElement("div");
-      div.classList.add("card-image");
-      let img = document.createElement("img");
-
-
-      let fileInput = document.createElement("input");
-      fileInput.type = "file";
-      fileInput.accept = "image/*";
-
-      div.appendChild(fileInput);
-
-
-      if (cardData[field.name]) {
-        let assetId = cardData[field.name].split("|")[1];
-        img.src = assetsUrl + assetId;
-        div.classList.add("card-image-full");
-      } else {
-        img.src = "images/add_image.png";
-      }
-
-      const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'card-image-pick';
-      choose.setAttribute('aria-label', `Choose ${field.name.substring(1)} image for card ${num}`);
-      img.alt = ''; choose.appendChild(img); div.appendChild(choose);
-      choose.addEventListener('click', () => fileInput.click());
-      fileInput.addEventListener("change", (ev: Event) => { saveCardImage(rowId, entrySession, field.name, ev) });
-
-      entry.appendChild(div);
+      const cell = createArtworkCell({
+        label: `${field.name.substring(1)} for card ${num}`,
+        reference: cardData[field.name] ?? '', assets: artworkAssets, assetsUrl,
+        choose: value => chooseCardArtwork(rowId, entrySession, field.name, value),
+        upload: event => { void saveCardImage(rowId, entrySession, field.name, event); },
+        draft: () => { imageTargets.cancel(rowId, field.name); invalidateOutput(); },
+      });
+      artworkCells.set(artworkKey(rowId, field.name), cell);
+      entry.appendChild(cell.element);
     }
   }
 
@@ -408,14 +420,19 @@ async function saveCardImage(rowId: string, session: number, name: string, event
   const target = { rowId, name, uploadId: crypto.randomUUID() };
   const context = { ...pageBinding };
   imageTargets.start(target);
+  artworkCells.get(artworkKey(rowId, name))?.pending(`Uploading ${file.name}…`);
+  invalidateOutput();
   try {
     if (file.size > 32 * 1024 * 1024) throw new Error('Choose an image smaller than 32 MiB.');
     const data = new Uint8Array(await file.arrayBuffer());
     if (pageBinding.session !== context.session || !rowIds.includes(target.rowId) || !imageTargets.matches(target)) return;
     sendMessage({ type: 'create-image-data', data: { ...target, data, mimeType: file.type, filename: file.name } });
   } catch (error) {
-    imageTargets.finish(target);
-    if (pageBinding.session === context.session) showDeckError(error instanceof Error ? error.message : 'Could not read the image.');
+    if (pageBinding.session === context.session && imageTargets.matches(target)) {
+      imageTargets.finish(target);
+      const text = error instanceof Error ? error.message : 'Could not read the image.';
+      artworkCells.get(artworkKey(rowId, name))?.error(text); showDeckError(text);
+    }
   } finally { fileInput.value = ''; }
 }
 
@@ -453,6 +470,7 @@ function loadCardFields(requestData = true) {
 
 
 function reloadCardEntries() {
+  artworkCells.clear();
   document.querySelectorAll('.card-entry').forEach(e => e.remove());
   updateCardsEmptyState();
 
@@ -475,6 +493,14 @@ function invalidateOutput() {
 
 function forgeCards() {
   try {
+    const mode = (document.getElementById('forge-type') as HTMLSelectElement).value;
+    if (!mode.startsWith('backs-')) for (const [key, cell] of artworkCells) {
+      const [rowId] = JSON.parse(key) as string[];
+      const card = cardsData[rowIds.indexOf(rowId)];
+      if (card && cardQuantity(card) > 0 && !cell.ready()) {
+        changeTab('cards'); cell.focus(); showDeckError('Finish choosing the Artwork image before generating cards.'); return;
+      }
+    }
     pdfReady = false;
     document.getElementById('download-pdf')?.classList.add('hidden');
     setPdfStatus('');
@@ -615,6 +641,7 @@ function updateTemplateSize() {
 
 function initCards() {
   loadCardFields(false);
+  document.getElementById('refresh-artwork')?.addEventListener('click', () => sendMessage({ type: 'load-artwork', data: null }));
   document.getElementById('correct-poker-size')?.addEventListener('click', () => {
     (document.getElementById('correct-poker-size') as HTMLButtonElement).disabled = true;
     document.getElementById('template-size-note')?.classList.add('hidden');

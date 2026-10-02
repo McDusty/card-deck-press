@@ -8,6 +8,7 @@ export class ImageTargets {
   matches(target: ImageTarget): boolean { return this.uploads.get(this.key(target)) === target.uploadId; }
   finish(target: ImageTarget): void { if (this.matches(target)) this.uploads.delete(this.key(target)); }
   clear(): void { this.uploads.clear(); }
+  cancel(rowId: string, name: string): void { this.uploads.delete(JSON.stringify([rowId, name])); }
   retainRows(rows: readonly string[]): void {
     const present = new Set(rows);
     for (const key of this.uploads.keys()) if (!present.has(JSON.parse(key)[0])) this.uploads.delete(key);
