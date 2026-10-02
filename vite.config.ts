@@ -4,6 +4,8 @@ import { resolve } from "node:path";
 import livePreview from "vite-live-preview";
 
 export default defineConfig({
+  // Keep assets beside the manifest, including GitHub Pages repository paths.
+  base: './',
   plugins: [
     {
       name: 'penpot-controller',

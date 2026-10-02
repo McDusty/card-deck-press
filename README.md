@@ -101,7 +101,23 @@ Fronts and backs have separate output containers. Generating one preserves the o
 
 **Download PDF** is available for six-up and nine-up front or back sheets after generation. PDFs contain 300-ppi raster sheet images on exact Letter or A4 pages. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
 
-## Install and develop locally
+## Install in Penpot
+
+Open Penpot's plugin manager, choose **Load from URL**, and paste:
+
+```text
+https://mcdusty.github.io/card-forge-upgraded/manifest.json
+```
+
+This hosted installation works without a local server. It appears as **Cardforge** in Penpot. Close and reopen the plugin to load an updated build; permission changes may require reinstalling it.
+
+### Automatic deployment
+
+Every push to **main** runs the build and tests, then publishes the built `dist` folder through GitHub Actions. A failed build or test leaves the previous deployment in place. The workflow can also be run manually from the repository's **Actions** tab.
+
+The deployment uses [GitHub's Pages workflow](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages) and [Vite's static build support](https://vite.dev/guide/static-deploy.html#github-pages). Relative asset paths support the repository subdirectory and the local preview.
+
+## Develop locally
 
 Use the local manifest below to run this fork. The original project's hosted manifest installs the upstream plugin, not Card Forge Updated.
 
