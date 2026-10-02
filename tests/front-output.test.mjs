@@ -232,9 +232,10 @@ for (const mode of ['fronts-6', 'backs-9']) {
 
 
 for (const orientation of ['portrait','landscape']) {
-  test(`new poker deck matches the Affinity reference (${orientation})`, () => {
+  test(`new poker deck matches the Affinity reference (${orientation})`, async () => {
     const f = fixture();
     f.createDeck(orientation);
+    await new Promise(resolve => setImmediate(resolve));
     const expected = orientation === 'portrait' ? [750,1050] : [1050,750];
     for (const name of ['Front','Back']) {
       const template = f.page.findShapes({ name, type: 'board' })[0];

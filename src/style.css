@@ -462,32 +462,51 @@ h3 {
 }
 
 .card-entry:has(.card-image) {
-  min-height: 114px;
+  min-height: 72px;
   padding-block: 8px;
   align-items: flex-start;
   box-sizing: border-box;
 }
 
-.card-entry .card-image { display: flex; gap: 10px; align-items: flex-start; }
-.card-image-preview { width: 40px; height: 56px; object-fit: contain; margin-top: 5px; }
+.card-entry .card-image { display: flex; gap: 10px; align-items: center; }
+.card-image-preview { width: 40px; height: 56px; object-fit: contain; }
 .card-image-preview[hidden] { display: none; }
-.card-image-controls { flex: 1; min-width: 0; padding-top: 5px; }
-.card-artwork-name, .card-artwork-select {
+.card-image-controls { flex: 1; min-width: 0; }
+.card-artwork-field { position: relative; }
+.card-artwork-name {
   box-sizing: border-box;
   display: block;
   width: 100%;
   height: 34px;
-  margin: 0 0 4px;
-  padding: 4px 8px;
+  margin: 0;
+  padding: 4px 36px 4px 8px;
   background: white;
   border: 1px solid #acd8d0;
   font: 14px/1.4 Arial, sans-serif;
 }
 .card-artwork-name[aria-invalid="true"] { border-color: #a52038; }
-.card-image-actions { display: flex; gap: 12px; }
-.card-image-actions button { border: 0; background: transparent; padding: 0; color: #176451; text-decoration: underline; font: 13px/1.5 Arial, sans-serif; cursor: pointer; }
+.card-artwork-edit { position: absolute; right: 1px; top: 1px; width: 32px; height: 32px; display: grid; place-items: center; border: 0; background: transparent; color: #176451; cursor: pointer; }
+.card-artwork-edit:hover { background: #eef3f2; }
 .card-artwork-status { display: block; color: #a52038; font: 12px/1.4 Arial, sans-serif; overflow-wrap: anywhere; }
 .card-artwork-status:empty { display: none; }
+
+.artwork-picker { box-sizing: border-box; width: min(580px, calc(100% - 32px)); max-height: calc(100% - 32px); padding: 24px; border: 1px solid #acd8d0; border-radius: 10px; background: white; color: #173d33; font: 14px/1.5 Arial, sans-serif; }
+.artwork-picker::backdrop { background: rgb(0 0 0 / 35%); }
+.artwork-picker-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.artwork-picker h2 { margin: 0; font-size: 22px; }
+.artwork-picker p { margin: 8px 0 12px; }
+.artwork-picker input { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #acd8d0; font: inherit; }
+.artwork-picker-count { font-size: 13px; }
+.artwork-picker-results { display: grid; gap: 8px; max-height: 330px; overflow-y: auto; }
+.artwork-picker button { font: inherit; cursor: pointer; }
+.artwork-picker-header button, .artwork-picker-actions button { border: 0; padding: 8px 12px; color: #176451; background: #eef3f2; }
+.artwork-picker-result { display: flex; align-items: center; gap: 12px; padding: 8px 12px; text-align: left; border: 1px solid #dbe6e1; background: white; color: inherit; }
+.artwork-picker-result:hover, .artwork-picker-result[aria-pressed="true"] { background: #eef7f4; border-color: #176451; }
+.artwork-picker-result img { width: 40px; height: 48px; object-fit: contain; }
+.artwork-picker-result span { min-width: 0; overflow-wrap: anywhere; }
+.artwork-picker-result small { display: block; color: #527367; }
+.artwork-picker-actions { display: flex; gap: 12px; margin-top: 20px; }
+.card-artwork-edit:focus-visible, .artwork-picker button:focus-visible { outline: 2px solid #176451; outline-offset: 2px; }
 
 .btn-add {
   display: flex;

@@ -104,6 +104,8 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
     history: { undoBlockBegin() { const block = Symbol(); undoBlocks.push(['begin', block]); return block; }, undoBlockFinish(block) { undoBlocks.push(['finish', block]); } },
     createBoard: () => new Shape(),
     createRectangle: () => new Shape('rectangle'),
+    createText: characters => { const text = new Shape('text'); text.characters = characters; return text; },
+    uploadMediaData: async (name, data, mtype) => ({ id: name, width: 100, height: 100, mtype }),
     closePlugin: () => { closed = true; },
     ui: { open() {}, onMessage(callback) { listener = callback; }, sendMessage(message) { messages.push(message); if(message.type === 'PAGE_CONTEXT') binding = message.data; if(message.type === 'CARDS_DATA' || message.type === 'CSV_APPLIED') rows = [...message.rowIds]; } },
   };

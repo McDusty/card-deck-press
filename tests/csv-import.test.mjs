@@ -111,10 +111,10 @@ test('all-zero quantities retain old output, and large imports are blocked',()=>
  assert.throws(()=>parseCsv('card_id\n'+Array.from({length:501},(_,i)=>i).join('\n')),/500/);
 });
 
-test('new decks create visible Artwork; legacy _Images resolves existing references',()=>{
+test('new decks create visible Artwork; legacy _Images resolves existing references',async()=>{
  const f=fixture();const image=artwork(f);image.parent.name='_Images';image.parent.hidden=true;imageField(f);
  const result=preview(f,'card_id,art\n001,dragon.png');assert.equal(result.data.errors.length,0);
- f.createDeck();const boards=f.page.findShapes({name:'Artwork',type:'board'});assert.equal(boards.length,1);assert.equal(boards[0].hidden,false);
+ f.createDeck();await new Promise(resolve=>setImmediate(resolve));const boards=f.page.findShapes({name:'Artwork',type:'board'});assert.equal(boards.length,1);assert.equal(boards[0].hidden,false);
 });
 
 test('sheet PDF accepts the unexpanded imported dataset',async()=>{

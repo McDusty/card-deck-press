@@ -8,6 +8,7 @@ import { correctPokerTemplates, getTemplateSizeInfo } from './template-size';
 import { CsvImporter, validateImportedFields, readDeck, importFields } from './csv-import';
 import { cardsForOutput } from './deck-data';
 import { createArtworkBoard, getArtworkBoard, listArtwork, resolveArtwork } from './artwork';
+import { templatePlaceholder } from './template-placeholder';
 import { DeckSession } from './deck-session';
 import type { PageBinding } from './deck-session';
 import { ImageTargets } from './image-targets';
@@ -118,51 +119,82 @@ function selectArtwork(value: unknown) {
     } finally { if (target) imageTargets.finish(target); }
 }
 
-function createDeck(message: DeckEvent) {
+async function createDeck(message: DeckEvent) {
     if (penpot.currentPage) {
         const { width, height } = resolveDeckSize(message.size, message.orientation, message.data);
-        penpot.currentPage.name = message.name;
+        const context = { ...deckSession.context };
+        const media = await penpot.uploadMediaData('Card Forge image placeholder.png', templatePlaceholder, 'image/png');
+        if (!deckSession.matches(context)) throw new Error('The page changed. Return to an empty page and create the deck again.');
+        const pageRoot = penpot.currentPage.root;
+        if ('children' in pageRoot && pageRoot.children.length) throw new Error('The page must still be empty to create a deck.');
+        const previousName = penpot.currentPage.name;
+        const created: Board[] = [];
+        try {
+            penpot.currentPage.name = message.name;
 
-        createArtworkBoard(penpot);
+            created.push(createArtworkBoard(penpot));
 
 
-        front = penpot.createBoard();
-        front.name = "Front";
+            front = penpot.createBoard();
+            created.push(front);
+            front.name = "Front";
 
-        const inside = penpot.createBoard();
-        inside.name = "inside";
-        inside.borderRadius = 50;
+            const inside = penpot.createBoard();
+            inside.name = "inside";
+            inside.borderRadius = 50;
 
-        inside.strokes = [
-            {
-                strokeColor: '#000000',
-                strokeStyle: 'solid',
-                strokeWidth: 12,
-                strokeAlignment: 'inner',
-            },
-        ];
+            inside.strokes = [
+                {
+                    strokeColor: '#000000',
+                    strokeStyle: 'solid',
+                    strokeWidth: 12,
+                    strokeAlignment: 'inner',
+                },
+            ];
 
-        front.resize(width, height);
-        inside.resize(width, height);
-        inside.x = 0;
-        inside.y = 0;
+            front.resize(width, height);
+            inside.resize(width, height);
+            inside.x = 0;
+            inside.y = 0;
 
-        front.appendChild(inside);
+            front.appendChild(inside);
 
-        back = (front.clone() as Board);
-        back.name = "Back";
-        back.x += front.width + 100;
+            back = (front.clone() as Board);
+            created.push(back);
+            back.name = "Back";
+            back.x += front.width + 100;
 
-        penpot.closePlugin();
+            const title = penpot.createText('Card title');
+            if (!title) throw new Error('Could not create the title placeholder.');
+            title.name = '#title'; title.fontSize = String(Math.min(width, height) * 0.06);
+            title.growType = 'auto-height'; title.fills = [{ fillColor: '#173d33', fillOpacity: 1 }];
+            front.appendChild(title); title.resize(width * 0.84, height * 0.1);
+            title.x = front.x + width * 0.08; title.y = front.y + height * 0.08;
+
+            const image = penpot.createRectangle(); image.name = '#image';
+            image.fills = [{ fillImage: media, fillOpacity: 1 }];
+            front.appendChild(image); image.resize(width * 0.84, height * 0.6);
+            image.x = front.x + width * 0.08; image.y = front.y + height * 0.25;
+
+            penpot.closePlugin();
+        } catch (error) {
+            for (const board of created.reverse()) board.remove();
+            penpot.currentPage.name = previousName;
+            throw error;
+        }
     }
 }
 
 
-function handleCreateDeck(message: DeckEvent) {
+let creatingDeck = false;
+async function handleCreateDeck(message: DeckEvent) {
+    if (creatingDeck) return;
     const root: Board = (penpot.currentPage?.getShapeById("00000000-0000-0000-0000-000000000000") as Board);
     if (root && root.children.length == 0) {
-        try { createDeck(message); }
+        creatingDeck = true;
+        try { await createDeck(message); }
         catch (error) { sendUi({ type: 'DECK_SIZE_ERROR', data: error instanceof Error ? error.message : 'Could not create the deck.' }); }
+        finally { creatingDeck = false; }
     } else {
         sendUi({ "type": "ERROR_DECK_CREATE_PAGE_NOT_EMPTY", data: null });
     }

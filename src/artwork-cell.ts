@@ -1,5 +1,6 @@
 import { artworkName } from './artwork';
 import type { ArtworkAsset } from './artwork';
+import { openArtworkPicker, refreshArtworkPicker } from './artwork-picker';
 
 interface Hooks {
   label: string;
@@ -14,6 +15,7 @@ interface Hooks {
 export interface ArtworkCell {
   element: HTMLElement;
   refresh(assets: readonly ArtworkAsset[], reference: string): void;
+  accept(assets: readonly ArtworkAsset[], reference: string): void;
   pending(message: string): void;
   error(message: string): void;
   ready(): boolean;
@@ -26,18 +28,18 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
   const preview = document.createElement('img'); preview.alt = ''; preview.className = 'card-image-preview';
   const input = document.createElement('input'); input.type = 'text'; input.className = 'card-artwork-name';
   input.placeholder = 'Artwork image name'; input.setAttribute('aria-label', `Artwork name for ${hooks.label}`);
-  const select = document.createElement('select'); select.className = 'card-artwork-select';
-  select.setAttribute('aria-label', `Choose Artwork for ${hooks.label}`);
+  const field = document.createElement('div'); field.className = 'card-artwork-field';
+  const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'card-artwork-edit';
+  edit.setAttribute('aria-label', `Edit image for ${hooks.label}`); edit.setAttribute('aria-haspopup', 'dialog');
+  edit.title = 'Search or change image';
+  edit.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15l-1 6Z"/></svg>';
   const status = document.createElement('span'); status.className = 'card-artwork-status'; status.setAttribute('role', 'status');
   const statusId = `artwork-status-${crypto.randomUUID()}`; status.id = statusId;
   input.setAttribute('aria-describedby', statusId);
-  const actions = document.createElement('div'); actions.className = 'card-image-actions';
-  const upload = document.createElement('button'); upload.type = 'button'; upload.textContent = 'Upload';
-  upload.setAttribute('aria-label', `Upload image for ${hooks.label}`);
-  const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = 'Clear';
-  clear.setAttribute('aria-label', `Clear image for ${hooks.label}`);
   const file = document.createElement('input'); file.type = 'file'; file.accept = 'image/*'; file.hidden = true;
   let dirty = false;
+  let currentAssets = hooks.assets;
+  let currentReference = hooks.reference;
 
   function invalid(message: string) {
     input.setCustomValidity(message); input.setAttribute('aria-invalid', 'true');
@@ -49,25 +51,19 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
   input.addEventListener('input', () => {
     dirty = true; invalid('Press Enter or leave this field to match the image name.'); hooks.draft();
   });
-  input.addEventListener('change', () => choose(input.value));
+  input.addEventListener('change', () => { if (dirty) choose(input.value); });
   input.addEventListener('keydown', event => {
     if (event.key === 'Enter') { event.preventDefault(); choose(input.value); }
   });
-  select.addEventListener('change', () => { if (select.value) choose(select.value); });
-  upload.addEventListener('click', () => file.click());
+  edit.addEventListener('click', () => openArtworkPicker({
+    owner: element, label: hooks.label, assets: currentAssets, reference: currentReference,
+    assetsUrl: hooks.assetsUrl, choose, upload: () => file.click(),
+  }));
   file.addEventListener('change', hooks.upload);
-  clear.addEventListener('click', () => choose(''));
 
   function refresh(assets: readonly ArtworkAsset[], reference: string) {
-    select.replaceChildren();
-    const prompt = document.createElement('option'); prompt.value = '';
-    prompt.textContent = assets.length ? 'Choose from Artwork…' : 'No images in Artwork'; select.appendChild(prompt);
-    const choices = assets.map(asset => ({ asset, value: artworkName(assets, asset.reference) }));
-    for (const { asset, value } of choices.sort((a, b) => a.asset.path.localeCompare(b.asset.path))) {
-      const option = document.createElement('option'); option.value = asset.path; option.textContent = value;
-      select.appendChild(option);
-    }
-    select.disabled = !assets.length;
+    currentAssets = assets; currentReference = reference;
+    refreshArtworkPicker(element, assets, reference);
     const asset = assets.find(item => item.reference.split('|')[0] === reference.split('|')[0]);
     preview.hidden = !reference;
     if (reference) preview.src = hooks.assetsUrl + (asset?.reference ?? reference).split('|')[1];
@@ -75,13 +71,13 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
     if (!dirty) {
       input.value = artworkName(assets, reference); input.setCustomValidity(''); input.removeAttribute('aria-invalid');
       status.textContent = reference && !asset ? 'Current image is outside Artwork.' : '';
-      select.value = asset?.path ?? '';
     }
   }
-  actions.append(upload, clear);
-  controls.append(input, select, actions, status);
+  field.append(input, edit);
+  controls.append(field, status);
   element.append(preview, controls, file);
   refresh(hooks.assets, hooks.reference);
   const message = (text: string) => { dirty = true; invalid(text); };
-  return { element, refresh, pending: message, error: message, ready: () => input.validity.valid, focus: () => { input.focus(); input.reportValidity(); } };
+  return { element, refresh, accept: (assets, reference) => { dirty = false; refresh(assets, reference); },
+    pending: message, error: message, ready: () => input.validity.valid, focus: () => { input.focus(); input.reportValidity(); } };
 }

@@ -272,9 +272,9 @@
               <h2 id="help-start-heading">Quick start</h2>
               <ol>
                 <li>Open an <strong>empty Penpot page</strong>. In <strong>Create deck</strong>, choose a name, size, and orientation.</li>
-                <li>Click <strong>Create deck</strong>. The plugin creates <strong>Front</strong>, <strong>Back</strong>, and <strong>Artwork</strong> frames, then closes.</li>
+                <li>Click <strong>Create deck</strong>. The plugin creates <strong>Front</strong>, <strong>Back</strong>, and <strong>Artwork</strong> frames, then closes. Front starts with a <code>#title</code> text layer and a <code>#image</code> image placeholder.</li>
                 <li>Design Front. Name variable text or image layers with <code>#</code>, such as <code>#name</code>.</li>
-                <li>Reopen Card Forge Upgraded. In <strong>Edit deck</strong>, use <strong>Add Card</strong> or <strong>Import CSV</strong>.</li>
+                <li>Reopen Card Forge Upgraded. In <strong>Edit deck</strong>, use <strong>Add Card</strong> or <strong>Import CSV</strong>. New templates give each row <strong>Quantity</strong> (starting at 1), <strong>Title</strong>, and <strong>Image</strong>. CSV headers <code>title</code> and <code>image</code> map to the starter fields automatically.</li>
                 <li>Open <strong>Export</strong>, choose a layout, then click <strong>Generate Cards</strong>. Sheet layouts offer <strong>Download PDF</strong>.</li>
               </ol>
             </section>
@@ -366,8 +366,8 @@ Second line",dragon.png
                 <li>Reopen Card Forge Upgraded. <strong>Edit Deck</strong> now shows a column with your chosen name, such as <strong>art</strong> or <strong>illustration</strong>.</li>
               </ol>
               <h3>Add images manually</h3>
-              <p>In <strong>Edit Deck</strong>, each image cell lets you type an exact Artwork image name or select an image from <strong>Choose from Artwork</strong>. Press Enter or leave the name field to match it. Use a full path to distinguish duplicate names, such as <code>Artwork/creatures/dragon.png</code>.</p>
-              <p>Click <strong>Upload</strong> to add a new image. It is saved in Artwork with its filename and assigned to this card, ready to reuse in other rows or CSV imports. <strong>Clear</strong> removes the image from this card without deleting it from Artwork.</p>
+              <p>In <strong>Edit Deck</strong>, each image cell has one name field and a pencil button. Type an exact Artwork image name, then press Enter or leave the field to match it. Or click the <strong>pencil button</strong> to open the image picker, search by name, and choose a thumbnail. Use a full path to distinguish duplicate names, such as <code>Artwork/creatures/dragon.png</code>.</p>
+              <p>In the picker, click <strong>Upload image</strong> to add a new image. It is saved in Artwork with its filename and assigned to this card, ready to reuse in other rows or CSV imports. <strong>Clear image</strong> removes the image from this card without deleting it from Artwork. Close the picker or press Escape to keep the current image.</p>
               <p>After adding or renaming images directly in Penpot, click <strong>Refresh Artwork</strong> to update the choices. Missing or ambiguous names show an error; resolve them before generating fronts. Open <strong>Export</strong> and click <strong>Generate Cards</strong> to use your changes.</p>
               <h3>Match images from CSV</h3>
               <p>Place your source images in the <strong>Artwork</strong> frame as rectangles with image fills. Name each image rectangle with its exact filename, such as <code>healing.png</code>.</p>

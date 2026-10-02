@@ -15,6 +15,7 @@ import { printedCopies, cardQuantity } from './deck-data';
 import { createArtworkCell } from './artwork-cell';
 import type { ArtworkCell } from './artwork-cell';
 import type { ArtworkAsset } from './artwork';
+import { closeArtworkPicker } from './artwork-picker';
 let artworkAssets: ArtworkAsset[] = [];
 const artworkCells = new Map<string, ArtworkCell>();
 const artworkKey = (rowId: string, name: string) => JSON.stringify([rowId, name]);
@@ -276,7 +277,8 @@ function updateImageReference(target: ImageTarget, reference: string) {
   if (!assignCardImage(cardsData, rowIds, target, reference)) return;
   const note = document.getElementById('csv-deck-status');
   if (note) { note.textContent = ''; note.classList.add('hidden'); }
-  saveCardsData(); reloadCardEntries();
+  artworkCells.get(artworkKey(target.rowId, target.name))?.accept(artworkAssets, reference);
+  saveCardsData();
 }
 
 function chooseCardArtwork(rowId: string, session: number, name: string, value: string) {
@@ -377,7 +379,7 @@ function createCardEntry(num: number, cardData: CardRecord) {
 }
 
 function addEmptyCard() {
-  const cardData = newManualCard(cardsData);
+  const cardData = { ...newManualCard(cardsData), ...Object.fromEntries(cardFields.map(field => [field.name, ''])) };
   cardsData.push(cardData);
   rowIds.push(crypto.randomUUID());
   let entry = createCardEntry(cardsData.length, cardData);
@@ -470,6 +472,7 @@ function loadCardFields(requestData = true) {
 
 
 function reloadCardEntries() {
+  closeArtworkPicker();
   artworkCells.clear();
   document.querySelectorAll('.card-entry').forEach(e => e.remove());
   updateCardsEmptyState();

@@ -56,9 +56,9 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 
 ## Getting started
 
-1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin.
+1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front starts with a `#title` text layer and a `#image` image placeholder.
 2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
-3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. Set quantities for designs you want to print more than once.
+3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
 4. Open **Export**, select a layout, and click **Generate Cards**. Six-up and nine-up sheets offer **Download PDF**. Export individual boards through Penpot.
 
 The **Back** is a shared design and does not support variable fields. The in-plugin **Help** tab contains the full workflow.
@@ -103,9 +103,9 @@ Batch uploads support **100 images totaling 32 MiB**. Replace the fill on an exi
 In **Edit Deck**, each image field offers:
 
 - **Artwork image name:** type an exact filename or path, then press Enter or leave the field to match it.
-- **Choose from Artwork:** select an image already stored on the current page. Duplicate filenames use full paths.
-- **Upload:** add a new image to Artwork and assign it to this card. It keeps its filename and can be reused in other rows or CSV imports.
-- **Clear:** remove the card's image without deleting the source from Artwork.
+- **Pencil button:** open the image picker, search image names, and choose a thumbnail. Full paths distinguish duplicate filenames. Close the picker or press Escape to keep the current image.
+- **Upload image** (inside the picker): add a new image to Artwork and assign it to this card. It keeps its filename and can be reused in other rows or CSV imports.
+- **Clear image** (inside the picker): remove the card's image without deleting the source from Artwork.
 
 After adding or renaming images directly in Penpot, click **Refresh Artwork** to update the list. Missing or ambiguous names show an error and must be resolved before generating fronts.
 

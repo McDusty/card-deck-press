@@ -2,6 +2,12 @@ import type { Board, Page, Penpot, Shape } from '@penpot/plugin-types';
 
 export interface ArtworkAsset { name: string; path: string; reference: string }
 
+export function searchArtwork(assets: readonly ArtworkAsset[], query: string): ArtworkAsset[] {
+  const words = query.toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
+  return assets.filter(asset => words.every(word => asset.path.toLocaleLowerCase().includes(word)))
+    .sort((a, b) => a.path.localeCompare(b.path));
+}
+
 export function matchArtwork(assets: readonly ArtworkAsset[], value: string): ArtworkAsset[] {
   return assets.filter(asset => asset.name === value || asset.path === value || asset.path.replace(/^Artwork\//, '') === value);
 }
