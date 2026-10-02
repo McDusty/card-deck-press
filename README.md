@@ -1,144 +1,159 @@
-# Cardforge | Penpot Plugin
+# Card Forge Updated
 
-![](https://raw.githubusercontent.com/PIWEEK/cardforge/d25f9f0d062c040b668a82ac0256192b5ad3080e/public/images/main-logo.svg)
+**Card Forge Updated** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options while keeping Penpot as the design editor.
 
-## Development work
+Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. The plugin still appears as **Cardforge** in Penpot.
 
-The `codex/cardforge-import-print` branch develops CSV imports and front/back output. Requirements are in [the PRD](docs/cardforge-prd.md); verified findings and remaining checks are in [the feasibility plan](docs/feasibility.md). The installation URL below is the upstream release, not this development branch.
+## What changed from the original
 
-Build tooling requires Node 20.19+ on the 20.x line, or Node 22.12+ on later lines. Run `tilt up` from this repository or its parent Penpot project folder. Tilt installs locked dependencies, checks types, builds the plugin, and serves the preview on port 4400. The dashboard is at `http://localhost:10350`.
+| Area | Changes in this fork |
+| --- | --- |
+| Deck data | CSV import with column mapping, validation, preview, and repeat imports using stable card IDs. Google Sheets works through downloaded CSV files. |
+| Card quantities | A Quantity field lets one Healing row produce ten printed copies. CSV imports recognize the `quantity` header. |
+| Artwork | A visible Artwork frame stores reusable images. Batch uploads preserve filenames, which CSV image fields match by name or path. |
+| Card sizes | Corrected Poker and Tarot dimensions, 11 rectangular presets, custom sizes, and a Pixels / Inches / Millimeters selector. |
+| Output layouts | Fronts only or backs only, as individual cards or six-up and nine-up sheets. Original Standard, fold-over Print and Play, and Tabletop layouts remain available. |
+| Printing | US Letter by default for the new sheet layouts, optional A4, cards placed edge to edge, single shared cut lines, and physically sized PDF downloads. |
+| Interface | Create Deck, Edit Deck, Export, and Help tabs. Common actions stay at the top. Simpler buttons, fewer decorative images, and clearer empty states. |
+| Help | One scrollable guide with a table of contents, including CSV headers, quantities, image template setup, and printing. |
+| Data protection | Generation replaces only the output owned by that layout. Failed replacements preserve completed output; stale uploads and downloads are rejected after context changes. |
+| Development | Tilt setup, locked dependencies, compiler checks, and automated import, generation, and export tests. |
 
-Tilt rebuilds on source, public asset, and configuration changes. Its readiness check requests the plugin manifest. Generated files and dependencies are not watched, so builds do not trigger rebuild loops. Close and reopen Cardforge in Penpot after a rebuild to load the updated controller and UI. Press `Ctrl+C` in the Tilt terminal to stop its local preview.
+## Getting started
 
-Without Tilt, install dependencies with `npm ci` and build with `npm run build`. `npm run dev` builds in watch mode and starts a live preview; a normal build does not start a server. Stop any existing preview before switching between Tilt and standalone development. Both use port 4400, and the preview fails rather than silently switching ports.
+1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin.
+2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
+3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. Set quantities for designs you want to print more than once.
+4. Open **Export**, select a layout, and click **Generate Cards**. Six-up and nine-up sheets offer **Download PDF**. Export individual boards through Penpot.
 
-### Test locally in deployed Penpot
+The **Back** is a shared design and does not support variable fields. The in-plugin **Help** tab contains the full workflow.
 
-1. Run `tilt up` and wait for **cardforge** to show ready. The preview binds to localhost only and serves the built plugin with cross-origin headers.
-2. In Penpot on the same computer, open a scratch file. Open the plugin manager (`Command + Option + P` on macOS), choose **Load from URL**, and install `http://localhost:4400/manifest.json`.
-3. Allow local network access if your browser prompts, then run the locally installed Cardforge entry. This is a separate installation from the upstream URL.
-4. On an empty page, create a deck. The plugin closes after creation. Add a text layer inside **Front**, name it `#name`, then reopen Cardforge.
-5. Add two cards with different names. Forge them using **Standard**. Check that both names appear in the output.
-6. Reopen Cardforge and confirm both cards were saved. Change one name, forge again, and confirm the output updates.
+## CSV imports and deck updates
 
-Fronts-only and backs-only layouts, straight cut lines, and sheet PDF downloads are available for local testing. CSV import is available; PNG ZIP downloads remain pending. All layouts replace only their own completed output after a replacement succeeds. Unclaimed older frames named **Output** are preserved; remove unwanted older frames manually. After controller changes, close and reopen the plugin to load the new code. Manifest or permission changes may require reinstalling the local plugin.
+Use a unique, stable `card_id` for every row. The optional `quantity` column defaults to 1.
 
-If an HTTPS Penpot site cannot load localhost, check the browser's local network permission; Firefox is another option. See [Penpot's local plugin instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot) and [local network troubleshooting](https://help.penpot.app/mcp/#install-and-activate-1).
+```csv
+card_id,quantity,name,art
+healing,10,Healing,healing.png
+shield,4,Shield,shield.png
+```
 
-### CSV import and artwork
+This example expects a text layer named `#name` and an image placeholder named `#art` in Front. Print sheets contain ten Healing cards followed by four Shield cards.
 
-The **Help** tab is one scrollable guide with a clickable table of contents. It covers creation, sizes, templates, CSV/Google Sheets data, artwork, updates and recovery, output layouts, and printing. Its size table uses the same preset data as card creation.
+- **Import CSV:** map columns to Card ID, Quantity, template fields, or Ignore. Matching headers map automatically. Review the preview and added, changed, and removed records before applying.
+- **Updates:** each import replaces the complete card list. Keep IDs stable between imports, then generate cards again to update output. Existing output remains until a replacement succeeds.
+- **Quantity:** use whole numbers from 0 to 100. Zero excludes the card. Print sheets repeat copies; single-front, Standard, and Tabletop layouts include each nonzero design once.
+- **Export CSV:** download a lossless backup for editing and reimporting. Ignored source columns are not retained.
+- **Export for spreadsheets:** download a separate viewing copy that protects formula-like text with leading tabs. Use the raw CSV for lossless reimports; spreadsheet handling can vary.
+- **Restore previous import:** restore one saved card-list, mapping, and output-settings snapshot. This does not restore artwork or template edits, or regenerate output.
 
-1. Open **Edit deck → Import CSV**. **Download sample** provides a simple starting file. Google Sheets users can download their sheet as UTF-8 CSV.
-2. Include a unique `card_id` for every row. Optional `quantity` defaults to 1, accepts 0–100, and 0 excludes the card from output. IDs such as `001` stay text.
-3. Map columns to `#` template fields, Card ID, Quantity, or Ignore. Matching names map automatically: `name` → `#name`. Review the first five rows, counts, errors, and added/changed/removed records.
-4. Click **Apply import** to replace the whole card list. Existing generated boards stay in place and are marked out of date. Open **Export** and click **Generate Cards** to regenerate them.
-5. Use **Export CSV** for a backup and reimporting. **Export for spreadsheets** makes a viewing copy with formula-like values protected as text using leading tabs; use the raw CSV for lossless reimports. Spreadsheet applications can handle that protection differently. **Restore previous import** restores one saved dataset, mapping, and output-settings snapshot. It does not restore template or artwork edits or regenerate boards. Ignored CSV columns are discarded and do not appear in the export.
+Quoted commas, escaped quotes, Unicode, and multiline text are supported. Limits are **2 MiB per CSV, 100 columns, 500 records, and 1,000 printed copies**.
 
-Quoted commas, quotes, Unicode, and multiline text are supported. Limits are 2 MiB, 100 columns, 500 records, and 1,000 printed copies. These are protective caps, not measured performance promises. Print sheets repeat quantities consecutively; single-card/standard/tabletop outputs include each nonzero design once. A single shared back still produces one back.
+For **Google Sheets**, download the sheet as CSV and import that file. Live Google Sheets connections and automatic synchronization are not implemented.
 
-New decks include a visible **Artwork** board. Use **Add artwork images** in the import view to upload multiple images; filenames become layer names. The batch limit is 100 images / 32 MiB. You can also place image rectangles there yourself. CSV image fields match exact names including extensions, such as `dragon.png`. Use `Artwork/folder/dragon.png` to distinguish duplicate names. Missing or ambiguous names block Apply; an empty mapped image cell clears the field. Unmapped fields retain their template design.
+## Set up a template image
 
-Legacy `_Images` boards remain compatible and become visible Artwork containers when reused for uploads. Existing shape references remain intact. Image replacement on the same rectangle uses its current fill when regenerating. Complex vector artwork and shared Penpot libraries are not supported yet.
+1. Inside **Front**, draw a rectangle where the variable image should appear.
+2. Give it **one image fill** using a sample image. Set its size and crop in Penpot.
+3. Name it after the CSV column containing image filenames, with `#` at the start. An `art` column uses `#art`; an `illustration` column uses `#illustration`. Each variable layer needs a unique name.
+4. Put source images in **Artwork**. In the import view, **Add artwork images** uploads a batch and names each image rectangle after its filename. You can also place and name image rectangles yourself.
+5. Enter the exact image name, including its extension, in the CSV cell: for example, `healing.png`. Apply the import, then generate cards in Export.
 
-### Card size controls
+Use a path such as `Artwork/creatures/dragon.png` to distinguish duplicate names. Missing or ambiguous matches block the import. A blank mapped image cell clears that field; an unmapped field keeps its template content.
 
-**Create deck** now offers **Pixels / Inches / Millimeters** and **Custom size**. Pixels are interpreted at **300 ppi**: 750 × 1050 px = 2.5 × 3.5 inches = 63.5 × 88.9 mm. Switching units changes the display, not the physical dimensions. Custom width and height keep fractional pixels; orientation places the longer dimension horizontally or vertically. Dimensions must be 1–12,000 px per side. No bleed is added. A sheet that cannot fit the chosen size reports an error and keeps the card dimensions.
+Batch uploads support **100 images totaling 32 MiB**. Replace the fill on an existing Artwork rectangle and regenerate to use the updated image. Legacy `_Images` storage remains compatible and becomes visible when reused for uploads.
 
-The [card-size reference](docs/card-size-audit.md) now defines the preset list using MakePlayingCards' rectangular formats. Poker is 750 × 1050 px; Tarot is 825 × 1425 px. The 2.45 × 3.95-inch format is called **Medium**. Custom size supports other conventions, including exact 70 × 120 mm Tarot. Existing templates are not automatically resized by preset updates.
+Matching currently supports raster image rectangles on the current page. Shared Penpot libraries and complex vector components are not supported.
 
-### Fronts-only and backs-only output: local test build
+## Card sizes and measurements
 
-In **Export → Output Layout**, choose single fronts, six fronts, nine fronts, a single shared back, six backs, or nine backs. Fronts-only modes need a **Front** board; backs-only modes need a **Back** board. Back sheets repeat the shared design once for every card in the list. A single back produces one board.
+Pixels use a **300 ppi** convention: 300 pixels represent one printed inch. Changing the measurement selector changes the display, not the physical size.
 
-**US Letter** is the default paper. Cut lines default to **Yes** for sheets and can be switched off. Six-up and nine-up sheets use **5 mm margins** and **no gaps**. Adjacent cards share one straight cut line, so a single cut separates them without changing their size.
+| Preset | Pixels at 300 ppi | Inches | Millimeters |
+| --- | --- | --- | --- |
+| Poker | 750 × 1050 | 2.5 × 3.5 | 63.5 × 88.9 |
+| Tarot | 825 × 1425 | 2.75 × 4.75 | 69.85 × 120.65 |
 
-New poker decks use **750 × 1050 canvas units**, equivalent to **63.5 × 88.9 mm (2.5 × 3.5 inches)** at 300 ppi. The sample border now follows the template edge instead of a smaller inset frame. **Import CSV** and **Add Card** stay at the top of Edit Deck while scrolling. Output settings and PDF downloads live in the dedicated Export tab. The Edit deck tab shows the actual Front/Back dimensions. For an older poker deck, click **Correct poker size** to update the templates and the original smaller inset border. Custom artwork keeps its size and position. The correction is one Penpot undo step; forge again to update output. Custom card sizes are not converted.
+The rectangular preset list follows MakePlayingCards formats. The 2.45 × 3.95-inch format is called **Medium**. See the [card-size reference](docs/card-size-audit.md) for the full list and sources.
 
-Cards keep their template dimensions. Impossible layouts report an error. The final sheet contains only the remaining cards, in order. Layout, paper, and cut-line choices are saved with the page.
+**Custom size** supports other dimensions, including fractional pixels, from 1 to 12,000 px per side. Orientation places the longer dimension horizontally or vertically. No bleed is added automatically.
 
-Output is named **Fronts Output** or **Backs Output**. Each replaces only its own recorded output for the current page and template. Generating backs preserves generated fronts, and vice versa. Replacement is staged; field or clone failures preserve the previous completed output. Unclaimed boards are preserved.
+Older templates are not automatically resized. **Correct Poker Size** fixes the original short Poker template and its inset sample border in one Penpot undo step. Custom artwork keeps its size and position; regenerate output after correction.
 
-After forging a sheet layout, use **Download PDF** in the plugin. The file has exact Letter (612 × 792 points) or A4 page dimensions and contains the generated sheets in order. Print at **Actual Size / 100%**. The PDF embeds 300-ppi sheet images; it is not vector output. Reinstall the local manifest once if needed to approve the added download permission.
+## Output and printing
 
-Editable sheet boards retain the upstream 300-ppi canvas convention. Physical template migration, text-overflow validation, cancellation, real Penpot capacity benchmarks, and interrupted-run recovery remain pending. PDF assembly compresses and releases each decoded image before loading the next sheet. PNG dimensions are checked before decoding. Encoded input is capped at 256 MiB and embedded image streams at 128 MiB; PDF errors retain generated boards. Page and editor-session identities reject stale writes and uploads; edits invalidate pending downloads. Browser download and real Penpot rendering still require live verification; automated tests use a simulated Penpot API. Avoid running a separate build while Tilt is rebuilding the same output folder; use `node --test tests/*.test.mjs` once Tilt is ready.
+| Layout | Result |
+| --- | --- |
+| Single fronts | One front board per included design, without backs. |
+| Six fronts | Fronts arranged in a 2 × 3 grid per sheet. |
+| Nine fronts | Fronts arranged in a 3 × 3 grid per sheet. |
+| Single shared back | One back board, without fronts. |
+| Six backs / Nine backs | Shared backs repeated to match the number of included card copies. |
+| Standard | Separate card designs for individual export, retaining the original workflow. |
+| Print and Play | The original A4 fold-over layout with fronts and backs together. |
+| Tabletop | A 10 × 7 sheet with up to 69 designs and a shared back. |
 
-A synthetic Node check assembled 112 Letter sheets (1,000 nine-up copies) with about 257 MiB peak process memory. This checks PDF assembly with simple test images; it is not a browser or real-artwork capacity guarantee.
+Six-up and nine-up sheets default to **US Letter portrait**, with A4 available. They use **5 mm margins and no gaps** between cards. Cut lines default to Yes and can be turned off. Adjacent cards share one straight cut line.
 
-Run `npm test` for the compiler, standalone controller build, and generation behavior tests. The controller is bundled separately as one script because Penpot cannot evaluate unresolved JavaScript module imports.
+Cards retain their template dimensions. A layout that cannot fit reports an error instead of shrinking them. The final sheet contains only the remaining copies, in card-list order. Paper, layout, and cut-line settings are saved with the page.
 
-## Introduction
+Fronts and backs have separate output containers. Generating one preserves the other. Only recorded plugin-owned output is replaced; unrelated or older unclaimed Output frames are preserved.
 
-The Cardforge plugin for [Penpot](penpot.app) allows you to create decks for board games. You only have to design the front and the back of a card, create a list of all the cards that you want, and the plugin will generate an output to print the cards or even use on digital game systems.
+**Download PDF** is available for six-up and nine-up front or back sheets after generation. PDFs contain 300-ppi raster sheet images on exact Letter or A4 pages. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
 
-## Installation
+## Install and develop locally
 
-To install the component, just open the plugin manager in Penpot and paste this URL: https://cardforge-dn5.pages.dev/manifest.json
+Use the local manifest below to run this fork. The original project's hosted manifest installs the upstream plugin, not Card Forge Updated.
 
-## Usage
+Requires **Node.js 20.19+ on the 20.x line, or 22.12+ on later lines**, npm, and Tilt for the recommended development setup.
 
-### Create a new Deck
+From this repository, or the parent Penpot project folder:
 
-Go to an empty page. Open the plugin. Choose a name for the deck, select a size and orientation, and click "Create Deck."
+```sh
+tilt up
+```
 
-![](https://github.com/PIWEEK/cardforge/blob/main/screenshots/create_deck.jpg?raw=true)
+Tilt installs locked dependencies, checks types, builds the plugin, and serves it at **http://localhost:4400/**. Its dashboard is at **http://localhost:10350**. Wait for the **cardforge** service to show ready.
 
-The plugin will set the name of the page and create frames for the front and back of the card.
+In Penpot on the same computer, open the plugin manager, choose **Load from URL**, and use:
 
-The sample border follows the full card edge. Adjust the artwork to suit your design.
+```text
+http://localhost:4400/manifest.json
+```
 
-### Design a base card
+Allow local network access if your browser prompts. Test in a scratch file. After a rebuild, close and reopen the plugin to load the updated UI and controller. Manifest permission changes may require reinstalling it. Press `Ctrl+C` in the Tilt terminal to stop the preview.
 
-Design a card within the Front frame as you wish, but do not change the size or the name of the frame.
+Without Tilt:
 
-Add image and text layers for the sections of the card that will differ on each card. These variable layers must have a unique name and start with the character #. For example, #name, #background, #image, #power...
+```sh
+npm ci
+npm run dev
+```
 
-Design the back of the cards within the Back frame, but do not change the size or the name of the frame either. The back cannot have variable fields.
+The development command builds in watch mode and starts the preview. `npm run build` builds without starting a server. Reuse the Tilt-managed service if it is already running; both setups use port 4400.
 
-![](https://github.com/PIWEEK/cardforge/blob/main/screenshots/design.jpg?raw=true)
+For localhost loading issues, see [Penpot's local plugin instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot).
 
+### Validation
 
-### Cards list
+```sh
+npm test
+```
 
-Here you will find a list of all the cards in your deck. Click "Add Card" to create a new card.
+This runs the compiler, plugin build, and automated tests. The controller is bundled into a standalone script for Penpot. Avoid running a separate build while Tilt is rebuilding the same output folder; once Tilt is ready, run `node --test tests/*.test.mjs` for tests alone.
 
-For each card, you can assign values to the text or image variable fields.
+Automated tests use a simulated Penpot API. Real Penpot rendering, browser downloads, and capacity with large artwork still need live verification. CSV and export limits are protective caps, not performance guarantees.
 
-Every row has **Quantity**, starting at **1**. Set one Healing card to **10** to print ten copies without duplicating its row. Whole numbers 0–100 are supported; 0 excludes the card. Six-up, nine-up, backs, and fold-over sheets repeat quantities. Single-card, Standard, and Tabletop output includes each nonzero design once. Older cards without quantity still count as 1. CSV imports use the same `quantity` field.
+## Current limits and project notes
 
-![](https://github.com/PIWEEK/cardforge/blob/main/screenshots/cards.jpg?raw=true)
+Live Google Sheets synchronization, PNG ZIP downloads, text-overflow validation, cancellation controls, and interrupted-run recovery remain future work. PDFs are raster exports rather than vector documents. Existing editable boards retain the original 300-ppi canvas convention.
 
-You can also duplicate or delete a card.
+- [Product requirements](docs/cardforge-prd.md)
+- [Feasibility and remaining checks](docs/feasibility.md)
+- [Card-size audit and preset sources](docs/card-size-audit.md)
 
-When all the cards are ready, open **Export**, choose a layout, and click **Generate Cards**. Switching tabs retains output settings and a ready PDF; editing cards requires generating the output again.
+## Credits and feedback
 
+This fork builds on [PIWEEK/Cardforge](https://github.com/PIWEEK/cardforge). The original project's credit and MIT license are preserved in [LICENSE](LICENSE).
 
-### Forging cards
-
-![](https://github.com/PIWEEK/cardforge/blob/main/screenshots/forge.jpg?raw=true)
-
-You can create your cards in three different ways
-
-**Standard**: This method is for printing at a print shop. They typically require a separate file for each card, so this option generates a list of all the cards to export each one individually.
-
-**Print and Play**: This method is for printing the cards on a regular printer. It will arrange your cards on A4 pages, which you can export and print individually. It also set the front and back of each card together, so you can fold them along the joint to assemble the physical cards.
-
-**Tabletop**: This method creates a single frame containing all the cards arranged in a 10x7 grid, with the back positioned in the bottom right corner. This format is used by Tabletop Simulator and similar software.
-
-
-For both Standard and Print and Play, you can also choose to include cut marks to assist you (or the print shop) in cutting the cards.
-
-### Sample result
-
-![](https://github.com/PIWEEK/cardforge/blob/main/screenshots/export.jpg?raw=true)
-
-
-### Bleeding area and margins
-
-![](https://raw.githubusercontent.com/PIWEEK/cardforge/refs/heads/main/public/images/print_info.png)
-
-
-
-## Feedback and Support
-
-Please open an [issue](https://github.com/PIWEEK/cardforge/issues) either to provide feedback or to share a bug.
+Report bugs and suggest improvements in [Card Forge Updated issues](https://github.com/McDusty/card-forge-upgraded/issues).
