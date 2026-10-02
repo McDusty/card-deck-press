@@ -15,6 +15,26 @@ This document tracks evidence needed before implementing the [product requiremen
 - No development server was started. Check Tilt before any future server launch, and use a task-specific port if no managed service exists.
 - TypeScript language-server tools were unavailable in this session. Compiler checks were performed; language-server checks were not.
 
+## Local front-only test build
+
+After the baseline checks, the local preview was started and handed over to Tilt. Parent and repository Tiltfiles produce identical resources. Tilt installs dependencies, builds, serves port 4400, and checks the manifest for readiness. The user successfully installed and ran the existing plugin flow in deployed Penpot.
+
+The interface now includes individual fronts, six/nine-front sheets, a single shared back, and six/nine-back sheets. Each face owns and replaces its own generated output, independently. Back generation does not require Front. Letter is the default paper and sheets default to continuous cut lines. Six-up and nine-up sheets now use zero gaps and 5 mm margins, so adjacent cards have one shared trim edge and one cut line. Boundary indices prevent duplicated lines for fractional template coordinates. New poker templates match the user’s 750 × 1050 PNG reference (63.5 × 88.9 mm at its embedded 300-ppi resolution); older poker templates have an explicit **Correct poker size** action. It fixes 750 × 1039 templates and the original inset border, preserves custom artwork geometry, leaves existing output until regeneration, and groups the correction into one undo step. Custom card sizes are excluded.
+
+The user verified the Letter PNG size in Affinity. Their PNG is 2550 × 3300, matching the Affinity Letter reference. The Penpot PNG lacks resolution metadata, while the Affinity example includes it. Dedicated sheet PDFs now embed PNGs on exact physical pages. Automated checks cover A4/Letter page dimensions, no print scaling, complete exports, stale settings/templates, generation rollback, page identity, straight lines, independent outputs, and full-size poker fit. A PDF assembled from the user’s actual export measured 612 × 792 points and was rendered for visual inspection. These checks do not prove browser download permission or end-to-end Penpot PDF rendering; those remain live checks.
+
+This remains an incremental local test build, not a completed printing milestone or passed release gate. ZIP downloads, physical template migration, text overflow checks, cancellation, measured capacity, and full interruption recovery remain pending. Existing fronts-and-backs generators retain legacy replacement behavior.
+
+Automated controller tests cover 52-card six/nine-front page counts, partial sheets, order and template preservation, generation without Back, renamed ownership, unrelated output protection, copied page identity, clone failure cleanup, missing artwork, invalid/empty data, fit rejection, saved settings, and existing output modes. They use a fake Penpot API; actual Penpot runtime behavior remains to be checked.
+
+Browser checks exercise the visible output controls, front-only descriptions, page counts, paper selection, and empty-deck error. The unresolved ribbon image reference was corrected, and the local server returns the UI assets and controller successfully with cross-origin headers. The controller is now emitted as a standalone script to avoid shared-module imports that Penpot cannot evaluate.
+
+The current build passes 88 automated checks. Browser verification confirms three imported records produce four copies on one Letter nine-up sheet, preserve ID `001` and multiline Unicode text, and switch a 750 × 1050 custom size through inches and millimeters without changing it. A manual Healing row with Quantity 10 generates two nine-up sheets. Tilt was used for the latest previews and has now been stopped at the user's request, along with the Cardforge preview server.
+
+Help is now one continuous document with ten linked sections, a sticky table of contents on wide views, and a preset table generated from the card-creation data. Browser checks confirm sections stay visible, every contents target exists, and the CSV link scrolls to its section. Previous/Next paging was removed. The guide describes current features and explicitly identifies direct Sheets connections, shared-library artwork, text fitting, and PNG ZIP downloads as unavailable.
+
+The workflow now has Create Deck, Edit Deck, Export, and Help tabs. Output settings and PDF downloads live in Export. Switching tabs preserves settings and ready PDFs; card edits invalidate PDF readiness. Edit Deck keeps Import CSV on the left and Add Card on the right, with matching actions in an empty card table. Every row exposes Quantity, including older manual cards that default to one copy. Help explains quantity expansion and image placeholders named after spreadsheet columns, such as `art` → `#art`.
+
 ## Tooling findings
 
 **Dependency maintenance complete:** Penpot plugin types are pinned to 1.4.2, TypeScript to 5.9.3, Vite to 7.3.6, and vite-live-preview to 0.4.0. The updated compiler and production build pass. Existing plugin styles remain at 1.0.0.
@@ -27,15 +47,25 @@ The baseline dependency audit reported six vulnerable packages: one moderate and
 
 **Text API gap remains:** Published plugin types 1.4.2 still do not declare `Text.textBounds` or `waitForLayoutUpdate`, although current online documentation describes both. Confirm actual runtime availability and establish the minimum supported Penpot version during the text probe. Do not claim the dependency update alone enables those methods or cast away a missing runtime capability. [Text API](https://doc.plugins.penpot.app/interfaces/Text)
 
-## Artwork matching
+## CSV import and artwork
 
-**Evidence:** Library components expose names, paths, and instances. Cardforge currently stores uploaded artwork in a hidden board and assigns its fills to generated rectangles. Its manifest does not yet request `library:read`. [Library component API](https://doc.plugins.penpot.app/interfaces/LibraryComponent)
+**Implemented in the local test build:** UTF-8 CSV parsing, stable string IDs, quantities, column mapping, five-row preview, added/changed/removed counts, full replacement, one restore snapshot, CSV export, and a stale-output indicator. Imported fields and image references are revalidated before generation. Changed preview inputs invalidate Apply. Ignored columns are not retained.
 
-**Live test:** Use local assets containing one raster fill, a nested raster fill, duplicate names in different paths, a blank reference, and a deleted asset. Match an asset, insert its artwork into a cloned template frame, and compare its crop with the original frame.
+New decks create visible Artwork boards. Batch uploads name raster rectangles after filenames. Exact names/full paths resolve deterministically; duplicate or missing names block import. Legacy `_Images` references remain readable. Current image fills are used at generation, and template fill settings and geometry are preserved. Shared libraries and vector components remain later scope.
 
-**Pass:** Matching is deterministic; the expected artwork is visible; its placement is preserved; unsupported or ambiguous assets report an error before output replacement. Replacing or renaming an asset cannot silently substitute another asset.
+**Automated evidence:** Parser edge cases, invalid IDs/quantities, mapping changes, apply/restore rollback, artwork ambiguity/deletion/replacement, quantity expansion, original dataset PDF signatures, and legacy storage compatibility. Browser checks use a clearly labelled simulated Penpot host with the actual built controller/UI. They exercise file selection, preview, Apply, multiline editing, and quantity counts. These checks do not prove real Penpot upload, typography, crop rendering, or live download behavior.
 
-**Status:** API and source review complete. Live placement remains unverified.
+**Caps:** 2 MiB CSV, 100 columns, 500 records, 100 copies per card, 1,000 copies total; artwork batches up to 100 files / 32 MiB. These are protective limits and have not been capacity-benchmarked.
+
+**Next live check:** Import a scratch deck in deployed Penpot. Check duplicate paths, a blank image, renamed/deleted assets, multiline rules, sheet quantities, export/reimport, and restoration. Compare actual image crop and placement with the template.
+
+## Card size audit
+
+The [card-size reference](card-size-audit.md) now uses the rectangular formats from MakePlayingCards, with the 2.45 × 3.95-inch format renamed Medium at the user’s request. Source physical dimensions produce template dimensions directly. New-template tests verify Tarot 825 × 1425 px; all presets round-trip through their declared units. Exact 70 × 120 mm Tarot is available through Custom size. Existing templates remain unchanged. Circle/hexagon borders and cutting paths are later scope.
+
+## Card creation controls
+
+The Create Deck / Edit Deck / Export / Help tabs replace the old Cards workflow. The creation illustrations were removed. Presets and custom sizes can display pixels, inches, or millimeters at the existing 300-ppi convention. Unit switching preserves dimensions. Custom dimensions are checked before page mutation; orientation normalizes the long/short sides. The sheet fit guard applies to custom sizes without shrinking them. Pure conversion and controller tests cover these behaviors; live Penpot custom-template rendering remains to be checked.
 
 ## Text fitting
 
@@ -61,7 +91,7 @@ The baseline dependency audit reported six vulnerable packages: one moderate and
 
 ## Layout arithmetic
 
-The PRD's 63.5 × 88.9 mm preset, 2 mm spacing, and 5 mm margins require these occupied grid sizes without crop marks:
+The initial 2 mm gap / 5 mm margin proposal produced these occupied grid sizes. This historical comparison explains why current six-up and nine-up sheets now share trim edges with zero gaps:
 
 | Layout | Grid width | Grid height | Portrait A4 | Portrait US Letter |
 | --- | --- | --- | --- | --- |

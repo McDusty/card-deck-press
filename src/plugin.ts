@@ -1,24 +1,19 @@
 
+import { resolveDeckSize } from './card-sizes';
 import { Shape, Board } from '@penpot/plugin-types';
 import type { PluginUIEvent, DeckEvent, CardField } from './model';
+import { isFaceMode, isSheetMode, parseForgeRequest } from './output-options';
+import type { CardRecord } from './output-options';
+import { generateFrontOutput, exportFrontSheets } from './front-output';
+import { correctPokerTemplates, getTemplateSizeInfo } from './template-size';
+import { CsvImporter, validateImportedFields } from './csv-import';
+import { cardsForOutput } from './deck-data';
+import { createArtworkBoard, getArtworkBoard } from './artwork';
+const csvImporter = new CsvImporter(penpot);
+let pdfExporting = false;
 
 
-export const cardSizes = [
-    ["Dixit (80 x 120 mm)", 945, 1417],
-    ["Tarot (70 x 120 mm)", 827, 1417],
-    ["French tarot (61 x 112 mm)", 720, 1323],
-    ["Wonder (65 x 100 mm)", 768, 1181],
-    ["Volcano (70 x 110 mm)", 827, 1299],
-    ["Euro (59 x 92 mm)", 697, 1086],
-    ["Asia (57,5 x 89 mm)", 679, 1051],
-    ["Standard (Poker) (63,5 x 88 mm)", 750, 1039],
-    ["USA (56 x 87 mm)", 661, 1027],
-    ["Square L (80x80 mm)", 945, 945],
-    ["Desert (50 x 75 mm)", 590, 886],
-    ["Square S (70 x 70 mm)", 827, 827],
-    ["Mini EURO (45 x 68 mm)", 531, 803],
-    ["Mini Asia (43 x 65 mm)", 508, 768],
-    ["Mini USA (41 x 63 mm)", 484, 744]];
+
 
 
 let front: Board;
@@ -67,7 +62,7 @@ function loadCardFields() {
     const root: Board = (penpot.currentPage?.getShapeById("00000000-0000-0000-0000-000000000000") as Board);
     const card = (findByName(root, "Front") as Board);
 
-    const fields = findFields(card, [])
+    const fields = card ? findFields(card, []) : [];
 
     const assetsUrl = "https://design.penpot.app/assets/by-file-media-id/";
     penpot.ui.sendMessage({ "type": "CARD_FIELDS", "data": { fields: fields, assetsUrl: assetsUrl } });
@@ -94,12 +89,10 @@ function findByName(parent: Board, name: string): Shape | undefined {
 
 function createDeck(message: DeckEvent) {
     if (penpot.currentPage) {
+        const { width, height } = resolveDeckSize(message.size, message.orientation, message.data);
         penpot.currentPage.name = message.name;
 
-        const images = penpot.createBoard();
-        images.name = "_Images";
-        images.y = - 1000;
-        images.hidden = true;
+        createArtworkBoard(penpot);
 
 
         front = penpot.createBoard();
@@ -118,19 +111,10 @@ function createDeck(message: DeckEvent) {
             },
         ];
 
-        let size = parseInt(message.size)
-        let width: string | number = cardSizes[size][1];
-        let height: string | number = cardSizes[size][2];
-
-        if (message.orientation == "landscape") {
-            width = cardSizes[size][2];
-            height = cardSizes[size][1];
-        }
-
-        front.resize((width as number), (height as number));
-        inside.resize((width as number) - 48, (height as number) - 48);
-        inside.x = 24;
-        inside.y = 24;
+        front.resize(width, height);
+        inside.resize(width, height);
+        inside.x = 0;
+        inside.y = 0;
 
         front.appendChild(inside);
 
@@ -146,7 +130,8 @@ function createDeck(message: DeckEvent) {
 function handleCreateDeck(message: DeckEvent) {
     const root: Board = (penpot.currentPage?.getShapeById("00000000-0000-0000-0000-000000000000") as Board);
     if (root.children.length == 0) {
-        createDeck(message);
+        try { createDeck(message); }
+        catch (error) { penpot.ui.sendMessage({ type: 'DECK_SIZE_ERROR', data: error instanceof Error ? error.message : 'Could not create the deck.' }); }
     } else {
         penpot.ui.sendMessage({ "type": "ERROR_DECK_CREATE_PAGE_NOT_EMPTY" });
     }
@@ -159,7 +144,7 @@ function handleIsPageEmpty() {
 
 
 
-function createImage(data: Uint8Array, mimeType: string, num: number, name: string) {
+function createImage(data: Uint8Array, mimeType: string, num: number, name: string, filename: string) {
     penpot
         .uploadMediaData('image', data, mimeType)
         .then((data) => {
@@ -169,8 +154,11 @@ function createImage(data: Uint8Array, mimeType: string, num: number, name: stri
             shape.x = 0;
             shape.y = 0;
 
-            const images = (penpot.currentPage?.findShapes({ name: "_Images" })[0] as Board);
+            const images = getArtworkBoard(penpot);
+            shape.name = filename || name;
             images.appendChild(shape);
+            shape.x = images.x + (images.children.length - 1) * 300;
+            shape.y = images.y;
             penpot.ui.sendMessage({ "type": "IMAGE_CREATED", "data": { "num": num, "name": name, "id": shape.fills[0].fillImage?.id, "imageId": shape.id } });
         })
         .catch((err) => console.error(err));
@@ -190,8 +178,10 @@ function cloneCard(card: Shape, cardData: Record<string, any>, cardNum: string):
                 } else {
                     const imageId = cardData[prop].split("|")[0];
                     const image = penpot.currentPage?.getShapeById(imageId);
-                    if (image) {
-                        field.fills = image.fills;
+                    if (!cardData[prop]) field.fills = [];
+                    else if (image && image.fills !== 'mixed') {
+                        const fillImage = image.fills.find(fill => fill.fillImage)?.fillImage;
+                        field.fills = fillImage ? [{ ...(Array.isArray(field.fills) ? field.fills[0] : {}), fillImage }] : [];
                     }
                 }
             }
@@ -287,8 +277,17 @@ function countRectsFit(rectA: { width: number, height: number }, rectB: { width:
     return countWidth * countHeight;
 }
 
-function forgeCards(cardsData: [], type: string, cutMarks: boolean) {
+function forgeCards(cardsData: CardRecord[], type: string, cutMarks: boolean) {
     console.log("start forgecards", type, cutMarks);
+    const page = penpot.currentPage;
+    if (!page) throw new Error('Open a Penpot page first.');
+    const frontTemplate = page.findShapes({ name: 'Front', type: 'board' })[0];
+    const backTemplate = page.findShapes({ name: 'Back', type: 'board' })[0];
+    if (!frontTemplate || !backTemplate) throw new Error('This layout needs Front and Back boards. Choose a Fronts only layout to omit backs.');
+    if (type === 'printplay' && Math.max(
+        countRectsFit({ width: 2480, height: 3508 }, { width: frontTemplate.width + (cutMarks ? 200 : 0), height: frontTemplate.height * 2 + (cutMarks ? 200 : 0) }),
+        countRectsFit({ width: 3508, height: 2480 }, { width: frontTemplate.width + (cutMarks ? 200 : 0), height: frontTemplate.height * 2 + (cutMarks ? 200 : 0) })
+    ) === 0) throw new Error('A front-and-back pair does not fit on A4. Choose a smaller template or another layout.');
     let shapes = penpot.currentPage?.findShapes({ name: "Output" })
     if (shapes && (shapes.length > 0)) {
         shapes[0].remove();
@@ -426,14 +425,62 @@ function forgeCards(cardsData: [], type: string, cutMarks: boolean) {
 }
 
 
+async function uploadArtwork(value: unknown) {
+    let uploaded = 0;
+    try {
+        if (!Array.isArray(value) || !value.length || value.length > 100) throw new Error('Choose between 1 and 100 artwork files.');
+        const files = value as { name: string; mimeType: string; data: Uint8Array }[];
+        if (files.some(file => !file || typeof file.name !== 'string' || !file.mimeType?.startsWith('image/') || !(file.data instanceof Uint8Array))) throw new Error('Choose image files for artwork.');
+        if (files.reduce((sum, file) => sum + file.data.byteLength, 0) > 32 * 1024 * 1024) throw new Error('Upload at most 32 MiB of artwork at a time.');
+        const page = penpot.currentPage;
+        if (!page) throw new Error('Open a deck page first.');
+        const board = getArtworkBoard(penpot);
+        for (const file of files) {
+            const media = await penpot.uploadMediaData(file.name, file.data, file.mimeType);
+            if (penpot.currentPage?.id !== page.id) throw new Error('The active page changed. Return to the deck before uploading more artwork.');
+            const shape = penpot.createRectangle();
+            shape.name = file.name; shape.resize(media.width, media.height);
+            shape.fills = [{ fillImage: media, fillOpacity: 1 }];
+            const offset = board.children.reduce((right, child) => Math.max(right, child.x + child.width - board.x), 0);
+            board.appendChild(shape); shape.x = board.x + offset + 40; shape.y = board.y;
+            uploaded++;
+            penpot.ui.sendMessage({ type: 'ARTWORK_PROGRESS', data: { uploaded, total: files.length } });
+        }
+        penpot.ui.sendMessage({ type: 'ARTWORK_READY', data: { uploaded } });
+    } catch (error) {
+        penpot.ui.sendMessage({ type: 'CSV_ERROR', data: { message: `${uploaded} images uploaded. ${error instanceof Error ? error.message : 'Artwork upload failed.'}` } });
+    }
+}
+
+
 penpot.ui.onMessage((message: PluginUIEvent) => {
     console.log("[plugin] message: ");
     console.log(message);
 
     if (message.type === "create-deck") {
         handleCreateDeck((message as DeckEvent));
+    } else if (['csv-preview', 'csv-apply', 'csv-restore', 'csv-export', 'csv-status'].includes(message.type)) {
+        try {
+            if (pdfExporting && message.type !== 'csv-status') throw new Error('Wait for the PDF download to finish.');
+            if (message.type === 'csv-preview') penpot.ui.sendMessage({ type: 'CSV_PREVIEW', data: csvImporter.preview(message.data) });
+            else if (message.type === 'csv-export') penpot.ui.sendMessage({ type: 'CSV_EXPORT', data: csvImporter.export() });
+            else if (message.type === 'csv-status') penpot.ui.sendMessage({ type: 'CSV_STATUS', data: csvImporter.status() });
+            else {
+                const cards = message.type === 'csv-apply' ? csvImporter.apply(message.data) : csvImporter.restore();
+                penpot.ui.sendMessage({ type: 'CSV_APPLIED', data: cards });
+                loadCardFields();
+                penpot.ui.sendMessage({ type: 'CSV_STATUS', data: csvImporter.status() });
+                const settings = penpot.currentPage?.getPluginData('outputSettings');
+                if (settings) penpot.ui.sendMessage({ type: 'OUTPUT_SETTINGS', data: JSON.parse(settings) });
+            }
+        } catch (error) {
+            penpot.ui.sendMessage({ type: 'CSV_ERROR', data: { revision: message.data?.revision, message: error instanceof Error ? error.message : 'CSV operation failed.' } });
+        }
+    } else if (message.type === 'upload-artwork') {
+        void uploadArtwork(message.data);
     } else if (message.type === "save-cards-data") {
         penpot.currentPage?.setPluginData("cardsData", JSON.stringify(message.data));
+        penpot.currentPage?.setPluginData('csv-output-stale', 'true');
     } else if (message.type === "load-cards-data") {
         loadCardsData();
     } else if (message.type === "load-card-fields") {
@@ -445,14 +492,51 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             num: number;
             name: string;
         };
-        createImage(data, mimeType, num, name);
+        createImage(data, mimeType, num, name, message.data.filename);
     } else if (message.type === "forge-cards") {
-        forgeCards(message.data.cardsData, message.data.type, (message.data.cutMarks == "true"));
+        try {
+            if (pdfExporting) throw new Error('Wait for the PDF download to finish.');
+            const request = parseForgeRequest(message.data);
+            if (penpot.currentPage) validateImportedFields(penpot.currentPage, request.cardsData);
+            const outputCards = cardsForOutput(request.cardsData, request.type);
+            if (isFaceMode(request.type)) {
+                const output = generateFrontOutput(penpot, outputCards, request.type, request.paper, request.cutMarks, request.cardsData);
+                penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
+                if (!isSheetMode(request.type)) penpot.closePlugin();
+                else penpot.ui.sendMessage({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+            } else {
+                forgeCards(outputCards, request.type, request.cutMarks);
+            }
+            penpot.currentPage?.setPluginData('csv-output-stale', 'false');
+            if (penpot.currentPage?.getPluginData('csv-import-metadata')) penpot.ui.sendMessage({ type: 'CSV_STATUS', data: csvImporter.status() });
+        } catch (error) {
+            penpot.ui.sendMessage({ type: 'FORGE_ERROR', data: error instanceof Error ? error.message : 'Generation failed. Check your template and try again.' });
+        }
+    } else if (message.type === 'export-front-pdf') {
+        if (pdfExporting) return;
+        pdfExporting = true;
+        exportFrontSheets(penpot, message.data)
+            .then(data => penpot.ui.sendMessage({ type: 'FRONT_PDF_IMAGES', data }))
+            .catch(error => penpot.ui.sendMessage({ type: 'PDF_EXPORT_ERROR', data: error instanceof Error ? error.message : 'PDF export failed. Try again.' }))
+            .finally(() => { pdfExporting = false; });
+    } else if (message.type === 'load-template-size') {
+        penpot.ui.sendMessage({ type: 'TEMPLATE_SIZE', data: getTemplateSizeInfo(penpot.currentPage) });
+    } else if (message.type === 'correct-poker-size') {
+        try {
+            if (pdfExporting) throw new Error('Wait for the PDF download to finish.');
+            penpot.ui.sendMessage({ type: 'POKER_SIZE_CORRECTED', data: correctPokerTemplates(penpot) });
+        } catch (error) {
+            penpot.ui.sendMessage({ type: 'TEMPLATE_SIZE_ERROR', data: error instanceof Error ? error.message : 'Size correction failed.' });
+        }
+    } else if (message.type === "load-output-settings") {
+        const settings = penpot.currentPage?.getPluginData('outputSettings');
+        if (settings) {
+            try { penpot.ui.sendMessage({ type: 'OUTPUT_SETTINGS', data: JSON.parse(settings) }); }
+            catch { console.warn('Saved output settings could not be read; using defaults.'); }
+        }
     } else if (message.type === "is-page-empty") {
         handleIsPageEmpty();
     }
 
 
 });
-
-

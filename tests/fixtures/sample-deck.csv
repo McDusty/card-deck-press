@@ -1,0 +1,5 @@
+card_id,quantity,name,rules,art
+001,3,"Queen, red","First line
+Second line: 火",dragon.png
+002,1,Joker,"Say ""hello""",
+003,0,Unused,Not printed,

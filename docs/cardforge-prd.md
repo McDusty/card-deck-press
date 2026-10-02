@@ -28,7 +28,7 @@ Cider offers useful examples of spreadsheet data, quantities, template choices, 
 
 **Later features**
 
-Direct Google Sheets import, selected-card printing, multiple templates per deck, backs-only output, separate front/back sheets, low-ink templates, and deck statistics.
+Direct Google Sheets import, selected-card printing, multiple templates per deck, automatic duplex alignment, low-ink templates, and deck statistics.
 
 **Outside the first release**
 
@@ -96,24 +96,18 @@ The feasibility milestone must prove overflow detection for supported text layer
 
 ## Artwork matching
 
-The first release targets raster artwork in the current file’s local Penpot library. The implementation must prove this workflow before committing to broader component support.
+The first release uses a visible, per-deck **Artwork** board on the current page. New templates create this container. Existing `_Images` storage remains readable and is revealed/renamed when reused, preserving shape identifiers.
 
-- Map an artwork column to an image field in the template.
-- Resolve artwork by the displayed asset name or full asset path, such as `Artwork/fire-drake`.
-- Show matched, missing, and ambiguous assets in the import preview.
-- Never choose arbitrarily between duplicate names.
-- Block generation when a nonblank artwork reference cannot be resolved.
-- Allow blank artwork values and render the field empty.
-- Preserve the artwork frame’s intended crop and placement.
-- Use current artwork contents when regenerating.
-- Retain a resolved asset identifier after a match. A renamed asset requires updating the displayed mapping; a deleted asset requires rematching. Do not silently switch to a different asset that happens to reuse its name.
-- Revalidate references before generation, because assets may have changed since import.
+- Batch-upload raster images into Artwork. Name each image rectangle after its uploaded filename, including the extension.
+- Map a CSV column to a template image field. Resolve exact names such as `dragon.png` or paths such as `Artwork/creatures/dragon.png`.
+- Show matched, missing, and ambiguous assets in the import preview. Duplicate names require a unique path; never choose one arbitrarily.
+- Block Apply when a nonblank reference cannot be resolved. Blank mapped cells clear the image; unmapped fields retain their template artwork.
+- Retain the resolved rectangle identifier. Renaming it must not silently select another rectangle. Deleting it blocks generation until rematched.
+- Use the current image fill when regenerating, while preserving the destination frame geometry and fill settings.
+- Revalidate references before generation. Replacing artwork does not regenerate existing output automatically.
+- Preserve successfully uploaded images if a later upload fails, and report the partial result.
 
-The match key is the Penpot asset name or path; it is not guaranteed to be the original upload filename.
-
-Penpot’s plugin API exposes library component names, paths, and instances. Reliable raster extraction and placement remain a feasibility test. [Penpot LibraryComponent API](https://doc.plugins.penpot.app/interfaces/LibraryComponent)
-
-Connected shared libraries and complex vector components are later scope.
+The initial batch cap is 100 images totaling 32 MiB. These are protective limits pending live capacity measurements. Complex vector components and connected/shared Penpot libraries are later scope.
 
 ## Output and printing
 
@@ -122,20 +116,24 @@ Connected shared libraries and complex vector components are later scope.
 | Individual fronts | One editable card board per included design; export front PNG files in a ZIP |
 | Six fronts per page | Two columns and three rows; fronts only |
 | Nine fronts per page | Three columns and three rows; fronts only |
+| Individual shared back | One editable board containing the shared Back design |
+| Six backs per page | Two columns and three rows; shared back repeated for each included card |
+| Nine backs per page | Three columns and three rows; shared back repeated for each included card |
 | Existing fold-over mode | Preserve the current joined front/back workflow |
 
 **Output defaults**
 
 - Individual image export includes each unique design once. Quantities apply to print sheets.
 - Front-only modes work without a back template.
-- Print sheets support A4 and US Letter.
+- Print sheets support A4 and US Letter; US Letter is the default.
+- Backs-only modes work without a Front template and replace their own output independently.
 - Card order follows CSV row order; copies appear consecutively.
 - The final sheet keeps the same grid and leaves unused positions empty.
 - Settings include page margins, card spacing, and optional crop marks.
 - Save the selected settings with the deck and show the expected page count.
 - Produce editable Penpot sheet boards and downloadable print PDFs.
 - A4 is 210 × 297 mm. US Letter is 215.9 × 279.4 mm. The new six- and nine-front grids use portrait orientation.
-- Start with 5 mm page margins, 2 mm spacing between cards, and crop marks off. Settings remain editable; fitting is checked before generation.
+- Six-up and nine-up sheets use 5 mm margins and zero gaps. Cards share trim edges, with one cut line per shared edge. Cut lines default on for sheets. Settings remain editable; fitting is checked before generation.
 
 **Physical size requirements**
 
@@ -153,7 +151,7 @@ If a requested grid cannot fit the card size, margins, spacing, and crop marks, 
 
 Crop marks indicate cutting positions. They do not create artwork bleed beyond the cut edge; production bleed support is later scope.
 
-When enabled, each crop mark starts 1 mm outside the cut edge and runs a further 2 mm, occupying 3 mm outside that edge. Include their occupied area in the fit calculation; marks must not enter neighboring card artwork or extend beyond the configured printable area.
+When enabled, cut lines run continuously across the printable area at each occupied card edge. Do not generate short corner marks that form boxes in the gaps. Keep guides at trim edges, with no guide through a card’s interior. Use one guide per shared edge, including with fractional canvas dimensions. Never replace two gap edges with a centre line that would alter the resulting card size.
 
 ## Download behaviour
 
@@ -210,7 +208,7 @@ A feasibility test must establish supported Penpot versions, required library pe
 
 ## Acceptance criteria
 
-Use the 63.5 × 88.9 mm poker preset, portrait A4, 5 mm margins, 2 mm spacing, and crop marks off for the page-count checks below. US Letter and layouts with crop marks have separate fit tests and must not be assumed to fit these defaults.
+Use the 63.5 × 88.9 mm poker preset, the selected portrait paper, and the layout defaults above for the page-count checks below. Test both A4 and Letter with cut lines enabled. Reject larger card dimensions that cannot fit without shrinking.
 
 - A 52-record deck with unique IDs and quantity 1 for every record produces 52 unique front images.
 - At six fronts per page, the same deck produces nine pages: eight full pages and four cards on the last page.

@@ -11,24 +11,22 @@
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200..700&display=swap" rel="stylesheet">
   <title>CardForge</title>
   <script type="module" crossorigin src="/index.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DCG1-saC.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-DoEd4Hq3.css">
 </head>
 
 <body>
   <div id="header">
     <img class="logo" src="images/main-logo.svg" />
-    <div class="tabs">
-      <div id="ts-create" data-tab="create" class="tab-selector selected">CREATE DECK</div>
-      <div id="ts-cards" data-tab="cards" class="tab-selector">CARDS</div>
-      <div id="ts-help" data-tab="help" class="tab-selector">HELP</div>
+    <div class="tabs" role="tablist" aria-label="Deck workflow">
+      <button id="ts-create" data-tab="create" class="tab-selector current" type="button" role="tab" aria-controls="tab-create" aria-selected="true">CREATE DECK</button>
+      <button id="ts-cards" data-tab="cards" class="tab-selector" type="button" role="tab" aria-controls="tab-cards" aria-selected="false" tabindex="-1">EDIT DECK</button>
+      <button id="ts-export" data-tab="export" class="tab-selector" type="button" role="tab" aria-controls="tab-export" aria-selected="false" tabindex="-1">EXPORT</button>
+      <button id="ts-help" data-tab="help" class="tab-selector" type="button" role="tab" aria-controls="tab-help" aria-selected="false" tabindex="-1">HELP</button>
     </div>
   </div>
   <div id="content">
-    <div id="tab-create" class="tab">
+    <div id="tab-create" class="tab" role="tabpanel" aria-labelledby="ts-create">
       <div id="box-create" class="box box-small">
-        <div class="art">
-          <img src="images/decks.svg" />
-        </div>
         <div class="corner top-left">
           <img src="images/corner.svg" />
         </div>
@@ -46,28 +44,39 @@
         </div>
 
         <form id="create-deck-frm">
-          <h3>Create new deck</h3>
-          <div class="input-text"><label>DECK NAME</label><input id="create-deck-name" type="text" required="required"
+          <div class="input-text"><label for="create-deck-name">DECK NAME</label><input id="create-deck-name" type="text" required="required"
               value="Deck01" />
           </div>
           <div class="row-input">
             <div class="input-text">
-              <label>CARD SIZE</label>
+              <label for="create-deck-size">CARD SIZE</label>
               <select id="create-deck-size">
               </select>
             </div>
-            <div class="input-text"><label>DECK ORIENTATION</label>
+            <div class="input-text"><label for="create-deck-orientation">DECK ORIENTATION</label>
               <select id="create-deck-orientation">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
               </select>
             </div>
           </div>
+          <div class="row-input">
+            <div class="input-text"><label for="create-deck-units">MEASUREMENTS</label>
+              <select id="create-deck-units"><option value="px">Pixels (px)</option><option value="inch">Inches</option><option value="mm">Millimeters (mm)</option></select>
+            </div>
+          </div>
+          <div id="custom-card-size" class="row-input hidden">
+            <div class="input-text"><label id="custom-width-label" for="custom-card-width">WIDTH (PX)</label><input id="custom-card-width" type="number" step="any" disabled /></div>
+            <div class="input-text"><label id="custom-height-label" for="custom-card-height">HEIGHT (PX)</label><input id="custom-card-height" type="number" step="any" disabled /></div>
+          </div>
+          <p id="create-size-note" role="status"></p>
+          <p id="create-size-error" class="hidden" role="alert"></p>
           <div class="modal-buttons">
             <button class="btn-primary" type="submit">CREATE DECK</button>
           </div>
         </form>
       </div>
+      <p class="create-deck-intro">First, choose a name and size to create your card templates on an empty Penpot page. Then design your templates in Penpot. In the next tab, <a id="create-edit-deck-link" href="#tab-cards">Edit Deck</a>, add cards manually or import a CSV.</p>
       <div id="box-create-error" class="box box-small hidden">
         <div class="art">
           <img src="images/skull.svg" />
@@ -98,23 +107,64 @@
 
       </div>
     </div>
-    <div id="tab-cards" class="tab">
+    <div id="tab-cards" class="tab" role="tabpanel" aria-labelledby="ts-cards">
       <div id="cards-container">
+        <div id="forge-entry" class="forge-entry" role="group" aria-label="Card actions">
+          <button id="upload-csv" class="btn-primary" type="button">IMPORT CSV</button>
+          <button id="correct-poker-size" class="btn-primary hidden" type="button">CORRECT POKER SIZE</button>
+          <button id="add-card" class="btn-primary" type="button">ADD CARD</button>
+        </div>
+        <div id="template-size-panel" class="template-size-panel">
+          <p id="template-size" role="status">Poker size: 750 × 1050 px (2.5 × 3.5 inches at 300 ppi).</p>
+          <p id="template-size-note" class="hidden" role="status"></p>
+          <p id="csv-deck-status" class="hidden" role="status"></p>
+          <div class="csv-backup-actions">
+            <button id="csv-export" type="button">Export CSV</button>
+            <button id="csv-restore" type="button" disabled>Restore previous import</button>
+          </div>
+        </div>
         <div id="cards-header" class="cards-header">
           <div class="card-num">NUM</div>
           <div id="cards-header-actions" class="card-num"></div>
         </div>
+        <p id="cards-fields-note" class="cards-fields-note" role="status">Card details come from the Front template in Penpot. Open Cardforge inside Penpot and add text layers such as #name or #rules to Front, then reopen the plugin to load those fields.</p>
         <div id="card-list" class="cards-list">
-        </div>
-        <div id="forge-entry" class="forge-entry">
-          <div id="add-card" class="btn-add">
-            <div class="btn-add-img"></div>
-            ADD CARD
+          <div id="cards-empty" class="cards-empty">
+            <h3>No cards yet</h3>
+            <p>Add your first card or import a CSV to fill this deck.</p>
+            <div class="cards-empty-actions">
+              <button id="empty-import-csv" class="btn-primary" type="button">IMPORT CSV</button>
+              <button id="empty-add-card" class="btn-primary" type="button">ADD CARD</button>
+            </div>
           </div>
-          <button id="forge-cards" class="btn-primary">FORGE CARDS</button>
         </div>
       </div>
-      <div id="box-forge" class="box box-small hidden">
+      <section id="csv-panel" class="csv-panel hidden" aria-labelledby="csv-heading">
+        <div class="csv-actions">
+          <h3 id="csv-heading">Import CSV</h3>
+          <button id="csv-cancel" type="button">Cancel</button>
+          <button id="csv-apply" class="btn-primary" type="button" disabled>Apply import</button>
+        </div>
+        <p>Map spreadsheet columns to card fields. Every card needs a unique ID. Quantities default to 1.</p>
+        <input id="csv-file" class="hidden" type="file" accept=".csv,text/csv" />
+        <input id="artwork-files" class="hidden" type="file" accept="image/*" multiple />
+        <div class="csv-tools">
+          <button id="csv-choose" type="button">Choose CSV</button>
+          <button id="csv-sample" type="button">Download sample</button>
+          <button id="csv-add-artwork" type="button">Add artwork images</button>
+          <button id="csv-refresh" type="button">Refresh matches</button>
+        </div>
+        <p id="csv-filename"></p>
+        <p>Image columns match exact image names, including extensions, in Artwork. Use Artwork/folder/image.png to resolve duplicate names.</p>
+        <p id="csv-summary" role="status"></p>
+        <p id="csv-error" class="hidden" role="alert"></p>
+        <div id="csv-mapping"></div>
+        <h3>First five rows</h3>
+        <div id="csv-preview-table"></div>
+      </section>
+    </div>
+    <div id="tab-export" class="tab hidden" role="tabpanel" aria-labelledby="ts-export">
+      <div id="box-forge" class="box box-small">
         <div class="art">
           <img src="images/hammer.svg" />
         </div>
@@ -134,119 +184,265 @@
           <img src="images/marker.svg" />
         </div>
 
-        <form id="create-deck-frm">
-          <h3>FORGE CARDS</h3>
+        <form id="forge-frm">
+          <h3>EXPORT CARDS</h3>
           <div class="row-input">
             <div class="input-text">
-              <label>FORGE TYPE</label>
+              <label for="forge-type">OUTPUT LAYOUT</label>
               <select id="forge-type">
-                <option value="standard">Standard (print shop)</option>
-                <option value="printplay">Print and play</option>
-                <option value="tabletop">Tabletop Simulator</option>
+                <optgroup label="Fronts only — no backs">
+                  <option value="fronts-single">Single fronts (no backs)</option>
+                  <option value="fronts-6">6 fronts per page (2 × 3)</option>
+                  <option value="fronts-9">9 fronts per page (3 × 3)</option>
+                </optgroup>
+                <optgroup label="Backs only">
+                  <option value="backs-single">Single shared back (no fronts)</option>
+                  <option value="backs-6">6 backs per page (2 × 3)</option>
+                  <option value="backs-9">9 backs per page (3 × 3)</option>
+              </optgroup>
+              <optgroup label="Fronts and backs">
+                  <option value="standard">Standard (print shop)</option>
+                  <option value="printplay">Print and play (fold-over)</option>
+                  <option value="tabletop">Tabletop Simulator</option>
+                </optgroup>
               </select>
             </div>
-            <div class="input-text"><label>WITH CUT MARKS</label>
+            <div class="input-text"><label for="forge-cut-marks">WITH CUT LINES</label>
               <select id="forge-cut-marks">
-                <option value="true">Yes</option>
                 <option value="false">No</option>
+                <option value="true">Yes</option>
+              </select>
+            </div>
+          </div>
+          <div id="forge-paper-row" class="row-input hidden">
+            <div class="input-text">
+              <label for="forge-paper">PAPER</label>
+              <select id="forge-paper">
+                <option value="letter">US Letter portrait</option>
+                <option value="a4">A4 portrait</option>
               </select>
             </div>
           </div>
           <div id="forge-explain">
+            <p id="forge-template-size"></p>
             <div id="forge-explain-type"></div>
             <div id="forge-explain-marks"></div>
             <div id="forge-explain-warning">WARNING: Old outputs will be deleted</div>
           </div>
+          <p id="forge-error" class="hidden" role="alert" aria-live="polite"></p>
+          <p id="pdf-status" class="hidden" role="status" aria-live="polite"></p>
 
           <div class="modal-buttons">
-            <button id="box-forge-cancel" class="btn-primary btn-cancel">Cancel</button>
-            <button id="box-forge-ok" class="btn-primary">Forge!</button>
+            <button id="box-forge-cancel" type="button" class="btn-primary btn-cancel">Back to Edit Deck</button>
+            <button id="download-pdf" type="button" class="btn-primary btn-line hidden">Download PDF</button>
+            <button id="box-forge-ok" type="submit" class="btn-primary">Generate Cards</button>
           </div>
         </form>
       </div>
 
     </div>
-    <div id="tab-help" class="tab">
-      <div id="box-help" class="box box-small">
-        <div class="art">
-          <img src="images/help.svg" />
-        </div>
-        <div class="corner top-left">
-          <img src="images/corner.svg" />
-        </div>
-        <div class="corner top-right">
-          <img src="images/corner.svg" />
-        </div>
-        <div class="corner bottom-left">
-          <img src="images/corner.svg" />
-        </div>
-        <div class="corner bottom-right">
-          <img src="images/corner.svg" />
-        </div>
-        <div class="corner bottom">
-          <img src="images/marker.svg" />
-        </div>
-
-
-        <h3>HOW TO USE CARDFORGE</h3>
-        <div id="help-text">
-          <div id="help-text-0" class="help-text">
-            <h4>Create a new Deck</h4>
-            <p>Go to an empty page. Open the plugin. Choose a name for the deck, select a size and orientation, and
-              click "Create Deck."</p>
-            <p>The plugin will set the name of the page and create frames for the front and back of the card.</p>
-            <p>These frames have a bleed area (see further on) and a border. Feel free to modify them according to
-              your needs.</p>
+    <div id="tab-help" class="tab" role="tabpanel" aria-labelledby="ts-help">
+      <article id="box-help" class="help-guide" aria-labelledby="help-heading">
+        <header id="help-top" class="help-guide-heading">
+          <h1 id="help-heading">Cardforge guide</h1>
+          <p><strong>Create Deck → Edit Deck → Export.</strong> Set up your templates, add card details, then generate fronts, backs, or print sheets.</p>
+        </header>
+        <div class="help-guide-layout">
+          <nav class="help-toc" aria-label="Table of contents">
+            <h2>Contents</h2>
+            <ol>
+              <li><a href="#help-start">Quick start</a></li>
+              <li><a href="#help-size">Create a deck and choose a size</a></li>
+              <li><a href="#help-template">Design your template</a></li>
+              <li><a href="#help-edit">Edit cards</a></li>
+              <li><a href="#help-csv">Import CSV or Google Sheets data</a></li>
+              <li><a href="#help-artwork">Set up a template image</a></li>
+              <li><a href="#help-backup">Update, export, and restore</a></li>
+              <li><a href="#help-output">Choose an output layout</a></li>
+              <li><a href="#help-print">Print, cut lines, and bleed</a></li>
+              <li><a href="#help-trouble">Fix common problems</a></li>
+            </ol>
+          </nav>
+          <div class="help-guide-body">
+            <section id="help-start" aria-labelledby="help-start-heading">
+              <h2 id="help-start-heading">Quick start</h2>
+              <ol>
+                <li>Open an <strong>empty Penpot page</strong>. In <strong>Create deck</strong>, choose a name, size, and orientation.</li>
+                <li>Click <strong>Create deck</strong>. The plugin creates <strong>Front</strong>, <strong>Back</strong>, and <strong>Artwork</strong> frames, then closes.</li>
+                <li>Design Front. Name variable text or image layers with <code>#</code>, such as <code>#name</code>.</li>
+                <li>Reopen Cardforge. In <strong>Edit deck</strong>, use <strong>Add Card</strong> or <strong>Import CSV</strong>.</li>
+                <li>Open <strong>Export</strong>, choose a layout, then click <strong>Generate Cards</strong>. Sheet layouts offer <strong>Download PDF</strong>.</li>
+              </ol>
+            </section>
+            <section id="help-size" aria-labelledby="help-size-heading">
+              <h2 id="help-size-heading">Create a deck and choose a size</h2>
+              <p>The <strong>Measurements</strong> menu shows pixels, inches, or millimeters. Switching units keeps the same physical size.</p>
+              <p>Pixels use <strong>300 ppi</strong> (pixels per inch). Sizes describe the finished card, without extra bleed.</p>
+              <div class="help-table-wrap">
+                <table>
+                  <caption>Card size presets</caption>
+                  <thead><tr><th scope="col">Preset</th><th scope="col">Inches</th><th scope="col">Millimeters</th><th scope="col">Pixels at 300 ppi</th></tr></thead>
+                  <tbody id="help-card-sizes"></tbody>
+                </table>
+              </div>
+              <p>Choose <strong>Custom size</strong> to enter your own width and height. Each side must be between 1 and 12,000 px. Portrait places the longer side vertically; Landscape places it horizontally.</p>
+              <p>For exact <strong>70 × 120 mm Tarot</strong>, use Custom size. The Tarot preset is <strong>2.75 × 4.75 inches</strong>, or 69.85 × 120.65 mm.</p>
+              <p>Changing a preset affects new decks. Existing templates keep their dimensions. <strong>Correct Poker Size</strong> fixes older poker templates and their original inset border, while preserving custom artwork. Generate cards again in Export afterward.</p>
+              <p>These presets follow one printer's rectangular formats. Circle and hexagon formats are not included.</p>
+            </section>
+            <section id="help-template" aria-labelledby="help-template-heading">
+              <h2 id="help-template-heading">Design your template</h2>
+              <ul>
+                <li><strong>Front:</strong> the shared design for your card faces. Keep the frame name.</li>
+                <li><strong>Back:</strong> one shared back design. It has no per-card variable fields.</li>
+                <li><strong>Artwork:</strong> the central place for images used by your cards.</li>
+              </ul>
+              <p>Layers without a <code>#</code> name stay the same on every card. Give each variable layer a distinct name, such as <code>#name</code>, <code>#rules</code>, or <code>#art</code>.</p>
+              <p>Use a <strong>text layer</strong> for text fields. For image fields, use a <strong>rectangle with one image fill</strong>. Design its size and crop in the template.</p>
+              <p>See <a href="#help-artwork">Set up a template image</a> for step-by-step image setup and a CSV example.</p>
+              <p>Fronts-only output needs Front. Backs-only output needs Back. Layouts that include both sides need both frames.</p>
+              <p>Allow enough space for long names and rules. Automatic text-overflow checking and text shrinking are not available yet.</p>
+            </section>
+            <section id="help-edit" aria-labelledby="help-edit-heading">
+              <h2 id="help-edit-heading">Edit cards</h2>
+              <p><strong>Import CSV</strong> stays on the left and <strong>Add Card</strong> on the right of the top toolbar in <strong>Edit Deck</strong>.</p>
+              <p>An empty deck also shows these two buttons inside the card table. Use either location to start.</p>
+              <ul>
+                <li><strong>Add Card:</strong> add a row and enter its text or image values.</li>
+                <li><strong>Quantity:</strong> set the number of printed copies for that row. New cards start at 1. Use whole numbers from 0 to 100; 0 excludes the card from output.</li>
+                <li><strong>Duplicate / Delete:</strong> use the controls beside a card row.</li>
+                <li><strong>Import CSV:</strong> preview spreadsheet data before replacing the card list.</li>
+              </ul>
+              <p><strong>Example:</strong> add one Healing card and set Quantity to <strong>10</strong>. Print sheets include ten copies without needing ten rows. Editing the row updates every copy the next time you generate cards.</p>
+              <p>Quantities repeat cards in six-up, nine-up, back sheets, and fold-over layouts. Single-card, Standard, and Tabletop layouts include each nonzero design once. Older cards without a quantity count as 1.</p>
+              <p>Text fields support multiple lines. After a CSV import, you can also edit <strong>Card ID</strong>. Keep IDs unique when preparing another import. The CSV <code>quantity</code> column uses the same Quantity field.</p>
+              <p>Card edits are saved on the Penpot page. When you are ready, open the <strong>Export tab</strong> at the top and click <strong>Generate Cards</strong>. Repeat this after editing cards to update the output.</p>
+            </section>
+            <section id="help-csv" aria-labelledby="help-csv-heading">
+              <h2 id="help-csv-heading">Import CSV or Google Sheets data</h2>
+              <p>For <strong>Google Sheets</strong>, download the sheet as CSV, then upload that file. A direct Sheets connection is not available yet.</p>
+              <p>Use <code>quantity</code> as the CSV column header to map it automatically to each card's Quantity. For example, <code>001,10,Healing</code> under <code>card_id,quantity,name</code> prints ten Healing cards on sheets. If the quantity column is omitted, every row defaults to 1.</p>
+              <ol>
+                <li>In <strong>Edit Deck</strong>, choose <strong>Import CSV</strong> from the toolbar or the empty card table. You can also use <strong>Download sample</strong> in the import view.</li>
+                <li>Map columns to <strong>Card ID</strong>, <strong>Quantity</strong>, a template field, or <strong>Ignore</strong>. Matching names map automatically: <code>name</code> → <code>#name</code>.</li>
+                <li>Review the first five rows, printed-copy count, artwork matches, and added / changed / removed counts.</li>
+                <li>Fix any reported errors. Click <strong>Apply import</strong> to replace the whole card list, or <strong>Cancel</strong> to keep it.</li>
+                <li>Open <strong>Export</strong> and click <strong>Generate Cards</strong> to update the output.</li>
+              </ol>
+              <div class="help-table-wrap">
+                <table>
+                  <caption>CSV columns</caption>
+                  <thead><tr><th scope="col">Column</th><th scope="col">What to enter</th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row"><code>card_id</code></th><td>A unique, nonblank ID for every row. Keep it stable across updates. <code>001</code> stays text.</td></tr>
+                    <tr><th scope="row"><code>quantity</code></th><td>Optional. Defaults to 1 if the column is absent. Whole numbers 0–100; 0 excludes a card from output. A blank cell in a mapped quantity column is an error.</td></tr>
+                    <tr><th scope="row">Text fields</th><td>Text, including Unicode, commas, quotes, and line breaks. Quote CSV cells that contain commas or line breaks.</td></tr>
+                    <tr><th scope="row">Image fields</th><td>An exact Artwork image name or path. A blank mapped cell clears the image.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p>Example for a template with <code>#name</code>, <code>#rules</code>, and <code>#art</code>:</p>
+              <pre><code>card_id,quantity,name,rules,art
+001,3,"Queen, red","First line
+Second line",dragon.png
+002,1,Joker,"Say ""hello""",
+003,0,Unused,Not printed,</code></pre>
+              <p>Ignored columns are discarded. Unmapped template fields keep their template design. If a mapped layer is renamed, removed, or replaced, review the mapping again.</p>
+              <p><strong>Import limits:</strong> UTF-8 CSV, 2 MiB, 100 columns, 500 records, and 1,000 printed copies.</p>
+            </section>
+            <section id="help-artwork" aria-labelledby="help-artwork-heading">
+              <h2 id="help-artwork-heading">Set up a template image</h2>
+              <h3>Create an image placeholder in Front</h3>
+              <ol>
+                <li>Inside <strong>Front</strong>, draw a <strong>rectangle</strong> where each card's image should appear.</li>
+                <li>Give the rectangle <strong>one image fill</strong> using a sample image.</li>
+                <li>Name the rectangle after the spreadsheet column containing your image filenames, with <code>#</code> at the start. For example, an <code>art</code> column uses a rectangle named <code>#art</code>; an <code>illustration</code> column uses <code>#illustration</code>. Each variable layer needs a unique name.</li>
+                <li>Set the rectangle's size and image crop in Penpot.</li>
+                <li>Reopen Cardforge. <strong>Edit Deck</strong> now shows a column with your chosen name, such as <strong>art</strong> or <strong>illustration</strong>.</li>
+              </ol>
+              <h3>Add images manually</h3>
+              <p>In <strong>Edit Deck</strong>, click a card's image cell and choose a file. Repeat for each card that needs a different image. Open <strong>Export</strong> and click <strong>Generate Cards</strong> to use your changes.</p>
+              <h3>Match images from CSV</h3>
+              <p>Place your source images in the <strong>Artwork</strong> frame as rectangles with image fills. Name each image rectangle with its exact filename, such as <code>healing.png</code>.</p>
+              <p>Use an <code>art</code> column in your CSV. It maps automatically to the template's <code>#art</code> field. For example:</p>
+              <pre><code>card_id,name,art,quantity
+001,Healing,healing.png,10</code></pre>
+              <p>The Artwork image rectangle must be named <code>healing.png</code>. After applying the import, generate cards in <strong>Export</strong>. Print sheets include ten copies of this Healing card using that image.</p>
+              <p>In the import view, choose <strong>Add artwork images</strong> to upload a batch into Artwork. Each image gets its filename as its layer name.</p>
+              <p>You can also place image rectangles in Artwork yourself. Older <code>_Images</code> storage still works; it becomes visible Artwork storage when reused for an upload.</p>
+              <ul>
+                <li><strong>Exact name:</strong> <code>dragon.png</code>. Names are case-sensitive and include the extension.</li>
+                <li><strong>Duplicate names:</strong> use a path, such as <code>Artwork/creatures/dragon.png</code>. Make the path unique.</li>
+                <li><strong>Missing or ambiguous image:</strong> fix the name or path, then choose <strong>Refresh matches</strong>. Apply stays blocked until the errors are resolved.</li>
+                <li><strong>Replace an image:</strong> replace the fill on the same Artwork rectangle, then generate cards again in Export. Its current image is used.</li>
+              </ul>
+              <p><strong>Batch limit:</strong> 100 images totaling 32 MiB. If an upload stops partway through, successfully uploaded images remain in Artwork.</p>
+              <p>Matching supports raster image rectangles on the current page. Shared Penpot libraries and complex vector components are not supported yet.</p>
+            </section>
+            <section id="help-backup" aria-labelledby="help-backup-heading">
+              <h2 id="help-backup-heading">Update, export, and restore</h2>
+              <p>Update your spreadsheet, keep the same IDs, and upload a new CSV. <strong>Apply replaces the whole list</strong>: cards absent from the new file are removed from the list.</p>
+              <p>Existing generated boards stay in place after import. The <strong>out-of-date</strong> message means you need to generate cards again in Export.</p>
+              <ul>
+                <li><strong>Export CSV:</strong> save the current card data for backup or spreadsheet editing. Cards without IDs receive generated IDs in the export.</li>
+                <li><strong>Restore previous import:</strong> restore one saved snapshot of the card data, mappings, and output settings.</li>
+              </ul>
+              <p>Restore does not undo template or artwork edits and does not regenerate output. Review the restored data, then generate cards again in Export. A later import replaces the stored snapshot.</p>
+            </section>
+            <section id="help-output" aria-labelledby="help-output-heading">
+              <h2 id="help-output-heading">Choose an output layout</h2>
+              <p>Open <strong>Export → Output Layout</strong> to choose what to generate.</p>
+              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Sheet layouts offer <strong>Download PDF</strong> once generation succeeds. For single cards, export the generated boards using Penpot.</p>
+              <p>Switching tabs keeps your output settings and a ready PDF. Editing cards, importing data, or changing output settings requires generating the output again. Use <strong>Back to Edit Deck</strong> or the top tab to return to your cards.</p>
+              <div class="help-table-wrap">
+                <table>
+                  <caption>Output options</caption>
+                  <thead><tr><th scope="col">Layout</th><th scope="col">Result</th></tr></thead>
+                  <tbody>
+                    <tr><th scope="row">Single fronts</th><td>One separate front board for each included design. No backs.</td></tr>
+                    <tr><th scope="row">6 fronts / 9 fronts</th><td>Fronts only, in a 2 × 3 or 3 × 3 grid. Quantities repeat cards.</td></tr>
+                    <tr><th scope="row">Single shared back</th><td>One back board. No fronts.</td></tr>
+                    <tr><th scope="row">6 backs / 9 backs</th><td>The shared back repeated for the deck's printed-copy count.</td></tr>
+                    <tr><th scope="row">Standard</th><td>Separate front/back card output for each included design.</td></tr>
+                    <tr><th scope="row">Print and play (fold-over)</th><td>Front/back pairs on A4 pages. Fold each pair along the join. Quantities repeat cards.</td></tr>
+                    <tr><th scope="row">Tabletop Simulator</th><td>A 10 × 7 image grid, with one shared back in the last slot. Up to 69 included designs.</td></tr>
+                  </tbody>
+                </table>
+              </div>
+              <p><strong>Quantity 0</strong> excludes a card from every layout. Single-front, Standard, and Tabletop layouts include each nonzero design once. Print sheets repeat copies consecutively, in card-list order.</p>
+              <p>Fronts Output and Backs Output are independent: generating one keeps the other. A successful run replaces its own previous output. The older Standard, fold-over, and Tabletop modes share an Output frame that is replaced on each run.</p>
+            </section>
+            <section id="help-print" aria-labelledby="help-print-heading">
+              <h2 id="help-print-heading">Print, cut lines, and bleed</h2>
+              <ul>
+                <li><strong>Paper:</strong> six-up and nine-up sheets default to US Letter portrait. A4 is also available.</li>
+                <li><strong>Spacing:</strong> sheets use 5 mm margins and no gaps between cards.</li>
+                <li><strong>Cut lines:</strong> default to Yes for sheets. Each shared card edge gets one straight line. Switch them off if you prefer.</li>
+                <li><strong>Card size:</strong> cards keep the template dimensions. If the selected grid does not fit, choose another size or layout.</li>
+              </ul>
+              <p>After generating a sheet in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains the sheets in order, on physically sized Letter or A4 pages.</p>
+              <p>Print the PDF at <strong>Actual Size / 100%</strong>. Turn off Fit to Page. Measure a test card before printing the whole deck.</p>
+              <p>PDF sheets contain 300-ppi images. For single-card images, use Penpot's export controls. Automatic PNG ZIP downloads are not available yet.</p>
+              <p><strong>Bleed</strong> is artwork extending beyond the final cut edge. Cardforge's preset frames are the finished size and do not add a printer-specific bleed area. Use your printer's separate requirements when preparing commercial files.</p>
+              <p>Keep important text and symbols away from the card edge so cutting differences do not remove them.</p>
+            </section>
+            <section id="help-trouble" aria-labelledby="help-trouble-heading">
+              <h2 id="help-trouble-heading">Fix common problems</h2>
+              <dl>
+                <dt>Create deck says the page is not empty</dt><dd>Create the new deck on an empty page.</dd>
+                <dt>A template field is missing</dt><dd>Check its <code>#</code> name and layer type. Image fields need a rectangle with one image fill.</dd>
+                <dt>CSV Apply is disabled</dt><dd>Read the errors. Check IDs, quantities, column mapping, and exact artwork names. Then refresh the preview.</dd>
+                <dt>The deck changed after preview</dt><dd>Choose Refresh matches to get a fresh preview before applying.</dd>
+                <dt>Cards do not fit the sheet</dt><dd>Choose a compatible card size or layout, or use single cards. Large and Tarot cards may not fit a three-row sheet.</dd>
+                <dt>The PDF button is missing</dt><dd>Select a six-up or nine-up sheet layout in Export and click Generate Cards first.</dd>
+                <dt>Printed cards are the wrong size</dt><dd>Check the template dimensions and print scaling. A PNG's pixel count alone does not set its physical print size; use the sheet PDF for physical page sizing.</dd>
+                <dt>Changes do not show in output</dt><dd>Generate cards again in Export after editing card data, the template, or artwork. Reopen the plugin after a local plugin rebuild.</dd>
+              </dl>
+            </section>
+            <p class="help-back-top"><a href="#help-top">Back to contents</a></p>
           </div>
-          <div id="help-text-1" class="help-text hidden">
-            <h4>Design a base card</h4>
-            <p>Design a card within the Front frame as you wish, but do not change the size or the name of the frame.
-            </p>
-            <p>Add image and text layers for the sections of the card that will differ on each card. These variable
-              layers must have a unique name and start with the character #. For example, #name, #background, #image,
-              #power...</p>
-            <p>Design the back of the cards within the Back frame, but do not change the size or the name of the frame
-              either. The back cannot have variable fields.</p>
-          </div>
-          <div id="help-text-2" class="help-text  hidden">
-            <h4>Cards list</h4>
-            <p>Here you will find a list of all the cards in your deck. Click "Add Card" to create a new card.</p>
-            <p>For each card, you can assign values to the text or image variable fields.</p>
-            <p>You can also duplicate or delete a card.</p>
-            <p>When all the cards are ready, press "Forge Cards" to create them.</p>
-          </div>
-          <div id="help-text-3" class="help-text  hidden">
-            <h4>Forging cards (1/2)</h4>
-            <p>You can create your cards in three different ways</p>
-            <p><b>Standard:</b> This method is for printing at a print shop. They typically require a separate file for
-              each card, so this option generates a list of all the cards to export each one individually.</p>
-            <p><b>Print and Play:</b> This method is for printing the cards on a regular printer. It will arrange your
-              cards on A4 pages, which you can export and print individually. It also set the front and
-              back of each card together, so you can fold them along the joint to assemble the physical cards.</p>
-          </div>
-          <div id="help-text-4" class="help-text  hidden">
-            <h4>Forging cards (2/2)</h4>
-            <p><b>Tabletop:</b> This method creates a single frame containing all the cards arranged in a 10x7 grid,
-              with the back positioned in the bottom right corner. This format is used by <a
-                href="https://kb.tabletopsimulator.com/custom-content/custom-deck/" target="_blank">Tabletop
-                Simulator</a> and similar software.</p>
-            <p>&nbsp;</p>
-            <p>For both Standard and Print and Play, you can also choose to include cut marks to assist you (or the
-              print shop) in cutting the cards.</p>
-          </div>
-          <div id="help-text-5" class="help-text  hidden">
-            <h4>Bleeding area and margins</h4>
-            <p><img src="images/print_info.png" /></p>
-          </div>
         </div>
-
-        <div class="modal-buttons">
-          <button id="box-help-prev" class="btn-primary">&lt; PREV</button>
-          <div id="help-num">1/5</div>
-          <button id="box-help-next" class="btn-primary">NEXT &gt;</button>
-        </div>
-
-      </div>
+      </article>
     </div>
   </div>
 </body>
