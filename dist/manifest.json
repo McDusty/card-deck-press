@@ -1,9 +1,9 @@
 {
-  "name": "Card Forge Updated",
+  "name": "Card Forge Upgraded",
   "version": 2,
   "code": "plugin.js",
   "description": "Create card decks from Penpot templates and CSV, with flexible print layouts.",
-  "icon": "images/card-forge-updated.svg",
+  "icon": "images/card-forge-upgraded.svg",
   "permissions": [
     "content:read",
     "content:write",

@@ -44,7 +44,7 @@ penpot.on('pagechange', () => {
 let front: Board;
 let back: Board;
 
-penpot.ui.open("Card Forge Updated", "", {
+penpot.ui.open("Card Forge Upgraded", "", {
     width: 1200,
     height: 650,
 });

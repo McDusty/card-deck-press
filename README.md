@@ -1,8 +1,8 @@
-# Card Forge Updated
+# Card Forge Upgraded
 
-**Card Forge Updated** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
+**Card Forge Upgraded** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
 
-Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. Look for **Card Forge Updated** in Penpot's plugin menu.
+Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. Look for **Card Forge Upgraded** in Penpot's plugin menu.
 
 ## Install in Penpot
 
@@ -17,7 +17,7 @@ https://mcdusty.github.io/card-forge-upgraded/manifest.json
 ```
 
 4. Complete installation and approve the requested permissions: read and write document content, and allow downloads for PDF exports.
-5. Launch **Card Forge Updated** from the plugin manager. Start on an empty page if you are creating a new deck.
+5. Launch **Card Forge Upgraded** from the plugin manager. Start on an empty page if you are creating a new deck.
 
 Use the **manifest URL** above, rather than the GitHub repository URL or the website's home page. This URL installs the updated fork; the original Cardforge deployment is a different installation.
 
@@ -197,4 +197,4 @@ Live Google Sheets synchronization, PNG ZIP downloads, text-overflow validation,
 
 This fork builds on [PIWEEK/Cardforge](https://github.com/PIWEEK/cardforge). The original project's credit and MIT license are preserved in [LICENSE](LICENSE).
 
-Report bugs and suggest improvements in [Card Forge Updated issues](https://github.com/McDusty/card-forge-upgraded/issues).
+Report bugs and suggest improvements in [Card Forge Upgraded issues](https://github.com/McDusty/card-forge-upgraded/issues).
