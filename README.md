@@ -4,6 +4,27 @@
 
 Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. The plugin still appears as **Cardforge** in Penpot.
 
+## Install in Penpot
+
+The plugin is deployed on **GitHub Pages**. You do not need to download this repository, install Node.js, or run Tilt to use it.
+
+1. Open a design file in Penpot.
+2. Open **Plugin Manager** from the menu or toolbar.
+3. Choose **Load from URL** and paste this manifest URL:
+
+```text
+https://mcdusty.github.io/card-forge-upgraded/manifest.json
+```
+
+4. Complete installation and approve the requested permissions: read and write document content, and allow downloads for PDF exports.
+5. Launch **Cardforge** from the plugin manager. Start on an empty page if you are creating a new deck.
+
+Use the **manifest URL** above, rather than the GitHub repository URL or the website's home page. This URL installs the updated fork; the original Cardforge deployment is a different installation.
+
+If you previously installed the localhost version, install this hosted URL and launch that entry. The hosted plugin continues working when your local server is stopped. Close and reopen it to load a newly deployed build; permission changes may require reinstalling it.
+
+See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot). To work on the code, use the separate [local development setup](#develop-locally) below.
+
 ## What changed from the original
 
 | Area | Changes in this fork |
@@ -113,17 +134,7 @@ Fronts and backs have separate output containers. Generating one preserves the o
 
 **Download PDF** is available for six-up and nine-up front or back sheets after generation. PDFs contain 300-ppi raster sheet images on exact Letter or A4 pages. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
 
-## Install in Penpot
-
-Open Penpot's plugin manager, choose **Load from URL**, and paste:
-
-```text
-https://mcdusty.github.io/card-forge-upgraded/manifest.json
-```
-
-This hosted installation works without a local server. It appears as **Cardforge** in Penpot. Close and reopen the plugin to load an updated build; permission changes may require reinstalling it.
-
-### Automatic deployment
+## Automatic deployment
 
 Every push to **main** runs the build and tests, then publishes the built `dist` folder through GitHub Actions. A failed build or test leaves the previous deployment in place. The workflow can also be run manually from the repository's **Actions** tab.
 
@@ -131,7 +142,7 @@ The deployment uses [GitHub's Pages workflow](https://docs.github.com/en/pages/g
 
 ## Develop locally
 
-Use the local manifest below to run this fork. The original project's hosted manifest installs the upstream plugin, not Card Forge Updated.
+This setup is for developing and testing changes. For normal use, install the [hosted plugin](#install-in-penpot) instead.
 
 Requires **Node.js 20.19+ on the 20.x line, or 22.12+ on later lines**, npm, and Tilt for the recommended development setup.
 
