@@ -56,7 +56,7 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 
 ## Getting started
 
-1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front starts with a `#title` text layer and a `#image` image placeholder.
+1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front's **inside** frame starts with a `#title` text layer and a black `#image` image placeholder. Back also has a black image placeholder inside its **inside** frame for your shared back design.
 2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
 3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
 4. Open **Export**, select a layout, and click **Generate Cards**. Six-up and nine-up sheets offer **Download PDF**. Export individual boards through Penpot.

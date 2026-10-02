@@ -168,13 +168,18 @@ async function createDeck(message: DeckEvent) {
             if (!title) throw new Error('Could not create the title placeholder.');
             title.name = '#title'; title.fontSize = String(Math.min(width, height) * 0.06);
             title.growType = 'auto-height'; title.fills = [{ fillColor: '#173d33', fillOpacity: 1 }];
-            front.appendChild(title); title.resize(width * 0.84, height * 0.1);
+            inside.appendChild(title); title.resize(width * 0.84, height * 0.1);
             title.x = front.x + width * 0.08; title.y = front.y + height * 0.08;
 
             const image = penpot.createRectangle(); image.name = '#image';
             image.fills = [{ fillImage: media, fillOpacity: 1 }];
-            front.appendChild(image); image.resize(width * 0.84, height * 0.6);
+            inside.appendChild(image); image.resize(width * 0.84, height * 0.6);
             image.x = front.x + width * 0.08; image.y = front.y + height * 0.25;
+
+            const backInside = back.children.find(shape => shape.name === 'inside') as Board;
+            const backImage = image.clone(); backImage.name = 'Image';
+            backInside.appendChild(backImage);
+            backImage.x = back.x + width * 0.08; backImage.y = back.y + height * 0.25;
 
             penpot.closePlugin();
         } catch (error) {

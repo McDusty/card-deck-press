@@ -9,19 +9,30 @@ test('new decks expose Title and Image fields with a real image fill and keep Ba
   const f = fixture(); f.front.remove(); request(f); await tick();
   const front = f.page.findShapes({ name: 'Front' })[0];
   const back = f.page.findShapes({ name: 'Back' })[0];
-  const title = front.children.find(shape => shape.name === '#title');
-  const image = front.children.find(shape => shape.name === '#image');
+  const inside = front.children.find(shape => shape.name === 'inside');
+  const backInside = back.children.find(shape => shape.name === 'inside');
+  const title = inside.children.find(shape => shape.name === '#title');
+  const image = inside.children.find(shape => shape.name === '#image');
+  assert.equal(title.parent, inside); assert.equal(image.parent, inside);
   assert.equal(title.characters, 'Card title'); assert.equal(title.type, 'text');
   assert.equal(image.type, 'rectangle'); assert.equal(image.fills.length, 1);
   assert.ok(image.fills[0].fillImage.id);
   assert.ok(image.x >= front.x && image.y + image.height <= front.y + front.height);
-  assert.equal(back.children.some(shape => shape.name.startsWith('#')), false);
+  const backImage = backInside.children.find(shape => shape.name === 'Image');
+  assert.equal(backImage.parent, backInside);
+  assert.equal(backImage.fills[0].fillImage.id, image.fills[0].fillImage.id);
+  assert.equal(backImage.x - back.x, image.x - front.x);
+  assert.equal(backImage.y - back.y, image.y - front.y);
+  assert.equal(backInside.children.some(shape => shape.name.startsWith('#')), false);
   f.message('load-card-fields', null);
   assert.deepEqual(JSON.parse(JSON.stringify(f.messages.findLast(message => message.type === 'CARD_FIELDS').data.fields.map(field => [field.name, field.type]))), [['#title', 'text'], ['#image', 'image']]);
   f.forge('fronts-single', [{ quantity: '1', '#title': 'Healing', '#image': '' }]);
-  const card = f.output().children[0];
-  assert.equal(card.children.find(shape => shape.name === '#title').characters, 'Healing');
-  assert.equal(card.children.find(shape => shape.name === '#image').fills.length, 0);
+  const cardInside = f.output().children[0].children.find(shape => shape.name === 'inside');
+  assert.equal(cardInside.children.find(shape => shape.name === '#title').characters, 'Healing');
+  assert.equal(cardInside.children.find(shape => shape.name === '#image').fills.length, 0);
+  f.forge('backs-single', [{ quantity: '1', '#title': 'Healing', '#image': '' }]);
+  const outputInside = f.backOutput().children[0].children.find(shape => shape.name === 'inside');
+  assert.equal(outputInside.children.find(shape => shape.name === 'Image').fills[0].fillImage.id, image.fills[0].fillImage.id);
 });
 
 test('placeholder upload failure leaves an empty page unchanged and permits retry', async () => {
