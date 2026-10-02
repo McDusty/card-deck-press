@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 56 56" fill="none">
+  <title>Card Forge Updated</title>
+  <rect width="56" height="56" rx="12" fill="#176451"/>
+  <rect x="13" y="13" width="25" height="34" rx="4" transform="rotate(-12 13 13)" fill="#ACD8D0"/>
+  <rect x="21" y="9" width="25" height="34" rx="4" fill="white" stroke="#153D30" stroke-width="2"/>
+  <path d="M33.5 17L40 26L33.5 35L27 26L33.5 17Z" fill="#176451"/>
+  <path d="M26 14H29M38 38H41" stroke="#176451" stroke-width="2" stroke-linecap="round"/>
+</svg>

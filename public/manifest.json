@@ -1,8 +1,9 @@
 {
-  "name": "Cardforge",
+  "name": "Card Forge Updated",
   "version": 2,
   "code": "plugin.js",
-  "description": "Plugin to create cards for board games",
+  "description": "Create card decks from Penpot templates and CSV, with flexible print layouts.",
+  "icon": "images/card-forge-updated.svg",
   "permissions": [
     "content:read",
     "content:write",

@@ -2,7 +2,7 @@
 
 **Card Forge Updated** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
 
-Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. The plugin still appears as **Cardforge** in Penpot.
+Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. Look for **Card Forge Updated** in Penpot's plugin menu.
 
 ## Install in Penpot
 
@@ -17,11 +17,13 @@ https://mcdusty.github.io/card-forge-upgraded/manifest.json
 ```
 
 4. Complete installation and approve the requested permissions: read and write document content, and allow downloads for PDF exports.
-5. Launch **Cardforge** from the plugin manager. Start on an empty page if you are creating a new deck.
+5. Launch **Card Forge Updated** from the plugin manager. Start on an empty page if you are creating a new deck.
 
 Use the **manifest URL** above, rather than the GitHub repository URL or the website's home page. This URL installs the updated fork; the original Cardforge deployment is a different installation.
 
 If you previously installed the localhost version, install this hosted URL and launch that entry. The hosted plugin continues working when your local server is stopped. Close and reopen it to load a newly deployed build; permission changes may require reinstalling it.
+
+If the hosted entry still shows the old **Cardforge** name, reinstall it from the same manifest URL to refresh its saved name and icon. Original or older localhost installations may still appear separately as Cardforge.
 
 See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot). To work on the code, use the separate [local development setup](#develop-locally) below.
 
