@@ -1,6 +1,6 @@
 # Card Forge Updated
 
-**Card Forge Updated** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options while keeping Penpot as the design editor.
+**Card Forge Updated** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
 
 Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. The plugin still appears as **Cardforge** in Penpot.
 
@@ -8,16 +8,28 @@ Design a Front and shared Back template, add card details manually or from CSV, 
 
 | Area | Changes in this fork |
 | --- | --- |
+| Workflow | Dedicated Create Deck, Edit Deck, Export, and Help tabs separate template setup, card editing, generation, and guidance. |
+| Interface | Compact tabs, common actions at the top, simpler buttons, fewer decorative images, and helpful empty states. |
 | Deck data | CSV import with column mapping, validation, preview, and repeat imports using stable card IDs. Google Sheets works through downloaded CSV files. |
 | Card quantities | A Quantity field lets one Healing row produce ten printed copies. CSV imports recognize the `quantity` header. |
 | Artwork | A visible Artwork frame stores reusable images. Batch uploads preserve filenames, which CSV image fields match by name or path. |
 | Card sizes | Corrected Poker and Tarot dimensions, 11 rectangular presets, custom sizes, and a Pixels / Inches / Millimeters selector. |
 | Output layouts | Fronts only or backs only, as individual cards or six-up and nine-up sheets. Original Standard, fold-over Print and Play, and Tabletop layouts remain available. |
 | Printing | US Letter by default for the new sheet layouts, optional A4, cards placed edge to edge, single shared cut lines, and physically sized PDF downloads. |
-| Interface | Create Deck, Edit Deck, Export, and Help tabs. Common actions stay at the top. Simpler buttons, fewer decorative images, and clearer empty states. |
 | Help | One scrollable guide with a table of contents, including CSV headers, quantities, image template setup, and printing. |
 | Data protection | Generation replaces only the output owned by that layout. Failed replacements preserve completed output; stale uploads and downloads are rejected after context changes. |
 | Development | Tilt setup, locked dependencies, compiler checks, and automated import, generation, and export tests. |
+
+## UI and workflow improvements
+
+The updated interface follows a clear sequence: **Create Deck → Edit Deck → Export**. Help is available in its own tab throughout the process.
+
+- **Separate steps:** create the templates first, enter card data in Edit Deck, then choose output settings and generate cards in Export. Printing controls no longer interrupt card editing.
+- **Common actions within reach:** Import CSV and Add Card stay at the top of Edit Deck. An empty card table also offers both actions, with consistent button labels.
+- **Clearer navigation:** compact tabs sit together at the top right. The creation guide links directly to Edit Deck, and Export includes a Back to Edit Deck button.
+- **Simpler presentation:** decorative character artwork and button outlines were removed. The creation panel starts with the form, followed by a short explanation of what to do next.
+- **Useful feedback:** template dimensions, import previews, validation errors, and out-of-date output notices explain what needs attention before generating or downloading.
+- **Keyboard access and guidance:** tabs support keyboard navigation, row actions stay visible, and Help is one scrollable document with a clickable table of contents.
 
 ## Getting started
 
