@@ -142,3 +142,13 @@ test('batch artwork upload preserves filenames and reveals legacy storage withou
  f.message('upload-artwork',[{name:'new.png',mimeType:'image/png',data:new Uint8Array([1])}]);await new Promise(resolve=>setImmediate(resolve));
  assert.equal(f.messages.at(-1).type,'ARTWORK_READY');assert.equal(board.name,'Artwork');assert.equal(board.hidden,false);assert.equal(board.children[0].id,image.id);assert.equal(board.children[1].name,'new.png');
 });
+
+test('spreadsheet viewing export protects formula text while raw export remains lossless', () => {
+  const f = fixture();
+  const values = ['=1+1', '+SUM(1)', '-1+1', '@SUM(1)', '\t=1+1', ' =1+1', '＝1+1', 'ordinary, "quoted" text'];
+  f.message('save-cards-data', JSON.stringify(values.map(value => ({'#name': value}))));
+  const raw = parseCsv(f.message('csv-export', {spreadsheetSafe:false}).data);
+  assert.deepEqual(raw.rows.map(row => row.values[2]), values);
+  const safe = parseCsv(f.message('csv-export', {spreadsheetSafe:true}).data);
+  assert.deepEqual(safe.rows.map(row => row.values[2]), values.map((value, index) => index < values.length-1 ? '\t'+value : value));
+});

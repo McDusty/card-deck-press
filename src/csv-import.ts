@@ -178,7 +178,7 @@ export class CsvImporter {
     this.pending = null;
     return readDeck(page);
   }
-  export(): string {
+  export(spreadsheetSafe = false): string {
     const page = this.api.currentPage;
     if (!page) throw new Error('Open a deck page first.');
     const cards = readDeck(page);
@@ -190,7 +190,7 @@ export class CsvImporter {
       let id = card.card_id;
       if (!id) { id = `manual-${index + 1}`; while (used.has(id)) id += '-'; used.add(id); }
       return [id, card.quantity ?? '1', ...fieldNames.map(name => imageFields.includes(name) && card[name] ? assets.find(asset => asset.reference.split('|')[0] === card[name].split('|')[0])?.path ?? 'MISSING_ARTWORK' : card[name] ?? '')];
-    }));
+    }), spreadsheetSafe);
   }
   status() { const page = this.api.currentPage; return { canRestore: Boolean(page?.getPluginData(BACKUP)), stale: page?.getPluginData(STALE) === 'true' }; }
 }

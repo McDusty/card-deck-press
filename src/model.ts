@@ -1,6 +1,10 @@
 export interface BaseEvent {
     type: string;
     data: any;
+    pageId?: string | null;
+    session?: number;
+    rowIds?: string[];
+    requestId?: string;
 }
 
 

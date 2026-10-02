@@ -4,6 +4,10 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
   const messages = [];
   const undoBlocks = [];
   let listener;
+  const handlers = new Map();
+  let binding = { pageId: 'page-1', session: 1 };
+  let rows = [];
+  let rowSerial = 0;
   let cloneCount = 0;
   let failCloneAt = Infinity;
   let closed = false;
@@ -96,28 +100,41 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
   };
   const api = {
     currentPage: page,
+    on(event, callback) { handlers.set(event, callback); },
     history: { undoBlockBegin() { const block = Symbol(); undoBlocks.push(['begin', block]); return block; }, undoBlockFinish(block) { undoBlocks.push(['finish', block]); } },
     createBoard: () => new Shape(),
     createRectangle: () => new Shape('rectangle'),
     closePlugin: () => { closed = true; },
-    ui: { open() {}, onMessage(callback) { listener = callback; }, sendMessage(message) { messages.push(message); } },
+    ui: { open() {}, onMessage(callback) { listener = callback; }, sendMessage(message) { messages.push(message); if(message.type === 'PAGE_CONTEXT') binding = message.data; if(message.type === 'CARDS_DATA' || message.type === 'CSV_APPLIED') rows = [...message.rowIds]; } },
   };
+  function dispatch(type, data, extra = {}) {
+    if(api.currentPage?.id !== binding.pageId) handlers.get('pagechange')?.();
+    if(type === 'save-cards-data' && !extra.rowIds) {
+      const cards = JSON.parse(data);
+      extra = {...extra, rowIds: cards.map((_, index) => rows[index] ?? `client-${++rowSerial}`)};
+    }
+    if(type === 'save-cards-data' && extra.rowIds && (extra.pageId === undefined || extra.pageId === binding.pageId)) rows = [...extra.rowIds];
+    listener({...binding,...extra,type,data}); return messages.at(-1);
+  }
   return {
     api, page, front, root, shapes, messages, Shape, undoBlocks,
-    message(type, data, extra = {}) { listener({...extra,type,data}); return messages.at(-1); },
-    templateSize() { listener({ type: 'load-template-size' }); return messages.at(-1).data; },
-    correctPokerSize() { listener({ type: 'correct-poker-size' }); },
+    message: dispatch,
+    context: () => ({...binding}),
+    rowIds: () => [...rows],
+    switchPage(next) { api.currentPage = next; handlers.get('pagechange')?.(); },
+    templateSize() { dispatch('load-template-size', null); return messages.at(-1).data; },
+    correctPokerSize() { dispatch('correct-poker-size', null); },
     failNextClone() { failCloneAt = cloneCount + 1; },
     failSecondClone() { failCloneAt = cloneCount + 3; },
-    forge(type, cardsData, extra = {}) { closed = false; listener({ type: 'forge-cards', data: { type, cardsData, cutMarks: false, paper: 'a4', ...extra } }); },
+    forge(type, cardsData, extra = {}) { closed = false; dispatch('forge-cards', { type, cardsData, cutMarks: false, paper: 'a4', ...extra }); },
     output() { return page.getShapeById(page.getPluginData('front-output-current')); },
-    async exportPdf(type, cardsData, extra = {}) { listener({ type: 'export-front-pdf', data: { type, cardsData, cutMarks: false, paper: 'a4', ...extra } }); await new Promise(resolve => setImmediate(resolve)); },
+    async exportPdf(type, cardsData, extra = {}) { dispatch('export-front-pdf', { type, cardsData, cutMarks: false, paper: 'a4', ...extra }); await new Promise(resolve => setImmediate(resolve)); },
     backOutput() { return page.getShapeById(page.getPluginData('back-output-current')); },
     createDeck(orientation = 'portrait') {
       for (const child of [...root.children]) child.remove();
-      listener({ type: 'create-deck', name: 'Poker', size: '0', orientation, data: null });
+      dispatch('create-deck', null, {name:'Poker',size:'0',orientation});
     },
-    reopenSettings() { listener({ type: 'load-output-settings' }); },
+    reopenSettings() { dispatch('load-output-settings', null); },
     wasClosed() { return closed; },
   };
 }

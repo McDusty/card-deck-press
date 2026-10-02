@@ -8,6 +8,9 @@ import type { CardRecord } from './output-options';
 import { createSheetPdf, pdfFilename } from './sheet-pdf';
 import type { TemplateSizeInfo } from './template-size';
 import { initCsvUi } from './csv-ui';
+import type { PageBinding } from './deck-session';
+import { ImageTargets, assignCardImage } from './image-targets';
+import type { ImageTarget } from './image-targets';
 import { printedCopies, cardQuantity } from './deck-data';
 let csvMessage: ((type: string, data: unknown) => void) | undefined;
 
@@ -29,30 +32,53 @@ let assetsUrl = "";
 let sheetCutLines = true;
 let pdfReady = false;
 let pdfBusy = false;
+let pageBinding: PageBinding = { pageId: null, session: 0 };
+let rowIds: string[] = [];
+const imageTargets = new ImageTargets();
+let editRevision = 0;
+let pdfOperation: { id: string; revision: number; session: number } | null = null;
 let templateSizeInfo: TemplateSizeInfo = { templates: [], canCorrectPoker: false };
 
 function sendMessage(message: PluginUIEvent) {
-  parent.postMessage(message, '*');
+  parent.postMessage({ ...message, ...pageBinding }, '*');
 }
 
 
 function initMessageListener() {
   window.addEventListener("message", (event) => {
-    console.log("[main] received:");
-    console.log(event);
-    csvMessage?.(event.data.type, event.data.data);
+    if (event.source !== parent || !event.data || typeof event.data.type !== 'string') return;
+    const message = event.data;
+    if (message.type === 'PAGE_CONTEXT') {
+      pageBinding = { pageId: message.pageId, session: message.session };
+      cardsData = []; rowIds = []; cardFields = []; imageTargets.clear();
+      pdfOperation = null; setPdfBusy(false); invalidateOutput();
+      loadCardFields(false); reloadCardEntries();
+      csvMessage?.('CSV_RESET', null);
+      createDeckShowError(false);
+      return;
+    }
+    if (message.pageId !== pageBinding.pageId || message.session !== pageBinding.session) return;
+    if (message.type === 'CSV_APPLIED') { rowIds = message.rowIds; imageTargets.clear(); }
+    csvMessage?.(message.type, message.data);
     if (event.data.type == "ERROR_DECK_CREATE_PAGE_NOT_EMPTY") {
       createDeckShowError(true);
     } else if (event.data.type === 'DECK_SIZE_ERROR') {
       showCreateSizeError(event.data.data);
     } else if (event.data.type == "CARDS_DATA") {
-      loadCardsData(event.data.data);
+      loadCardsData(event.data.data, event.data.rowIds);
     } else if (event.data.type == "CARD_FIELDS") {
       assetsUrl = document.referrer ? new URL('/assets/by-file-media-id/', document.referrer).href : event.data.data.assetsUrl;
       cardFields = event.data.data.fields;
       loadCardFields();
     } else if (event.data.type == "IMAGE_CREATED") {
-      updateImageInfo(event.data.data.num, event.data.data.name, event.data.data.id, event.data.data.imageId);
+      updateImageInfo(event.data.data, event.data.data.id, event.data.data.imageId);
+    } else if (message.type === 'IMAGE_ERROR') {
+      const target = message.data as ImageTarget;
+      if (target.uploadId && !imageTargets.matches(target)) return;
+      imageTargets.finish(target);
+      showDeckError(message.data.message);
+    } else if (message.type === 'DECK_ERROR') {
+      showDeckError(message.data);
     } else if (event.data.type == "PAGE_EMPTY") {
       if (event.data.data) {
         changeTab("create");
@@ -82,11 +108,13 @@ function initMessageListener() {
       document.getElementById('download-pdf')?.classList.remove('hidden');
       setPdfStatus(`Generated ${event.data.data.sheets} ${event.data.data.sheets === 1 ? 'sheet' : 'sheets'}. Download the PDF and print at Actual Size (100%).`);
     } else if (event.data.type === 'PDF_EXPORT_PROGRESS') {
+      if (pdfOperation?.id !== message.requestId) return;
       setPdfStatus(`Preparing sheet ${event.data.data.current} of ${event.data.data.total}…`);
     } else if (event.data.type === 'FRONT_PDF_IMAGES') {
-      void downloadPdfImages(event.data.data);
+      if (pdfOperation && pdfOperation.id === message.requestId) void downloadPdfImages(message.data, pdfOperation);
     } else if (event.data.type === 'PDF_EXPORT_ERROR') {
-      setPdfBusy(false);
+      if (pdfOperation?.id !== message.requestId) return;
+      pdfOperation = null; setPdfBusy(false);
       showForgeError(event.data.data);
     } else if (event.data.type === 'OUTPUT_SETTINGS') {
       const settings = event.data.data;
@@ -214,23 +242,32 @@ let cardsData: CardRecord[] = [];
 
 function saveCardsData() {
   invalidateOutput();
-  sendMessage({ type: 'save-cards-data', data: JSON.stringify(cardsData) });
+  sendMessage({ type: 'save-cards-data', data: JSON.stringify(cardsData), rowIds });
 }
 
-function updateImageInfo(num: number, name: string, id: string, imageId: string) {
-  cardsData[num - 1][name] = imageId + "|" + id;
-  saveCardsData();
+function showDeckError(message: string) {
+  const note = document.getElementById('csv-deck-status')!;
+  note.textContent = message; note.classList.remove('hidden');
 }
 
-function loadCardsData(data: string) {
-  if (data) {
-    cardsData = JSON.parse(data);
-    loadCardFields(false);
-    reloadCardEntries();
-  }
+function updateImageInfo(target: ImageTarget, id: string, imageId: string) {
+  if (!imageTargets.matches(target)) return;
+  imageTargets.finish(target);
+  if (!assignCardImage(cardsData, rowIds, target, `${imageId}|${id}`)) return;
+  saveCardsData(); reloadCardEntries();
+}
+
+function loadCardsData(data: string, identities: string[]) {
+  cardsData = JSON.parse(data);
+  rowIds = identities;
+  loadCardFields(false);
+  reloadCardEntries();
 }
 
 function createCardEntry(num: number, cardData: CardRecord) {
+  const rowId = rowIds[num - 1];
+  const entrySession = pageBinding.session;
+  const currentIndex = () => pageBinding.session === entrySession ? rowIds.indexOf(rowId) : -1;
   let entry = document.createElement("div");
   entry.classList.add("card-entry");
   entry.id = "card-entry-" + num;
@@ -238,14 +275,16 @@ function createCardEntry(num: number, cardData: CardRecord) {
   let actions = document.createElement("div");
   actions.classList.add("card-actions");
 
-  let copy = document.createElement("div");
+  let copy = document.createElement("button");
+  copy.type = 'button'; copy.setAttribute('aria-label', `Duplicate card ${num}`);
   copy.classList.add("card-action-copy");
-  copy.addEventListener("click", () => { copyCard(num) });
+  copy.addEventListener("click", () => { currentIndex() >= 0 && copyCard(currentIndex() + 1) });
   actions.appendChild(copy);
 
-  let del = document.createElement("div");
+  let del = document.createElement("button");
+  del.type = 'button'; del.setAttribute('aria-label', `Delete card ${num}`);
   del.classList.add("card-action-delete");
-  del.addEventListener("click", () => { deleteCard(num) });
+  del.addEventListener("click", () => { currentIndex() >= 0 && deleteCard(currentIndex() + 1) });
   actions.appendChild(del);
 
   let number = document.createElement("div");
@@ -257,7 +296,7 @@ function createCardEntry(num: number, cardData: CardRecord) {
     const div = document.createElement('div'); div.className = 'card-text';
     const input = document.createElement('input'); input.value = cardData.card_id ?? '';
     input.setAttribute('aria-label', `Card ID for card ${num}`);
-    input.addEventListener('blur', () => saveCardText(num, 'card_id', input.value));
+    input.addEventListener('input', () => saveCardText(rowId, entrySession, 'card_id', input.value));
     div.appendChild(input); entry.appendChild(div);
   }
 
@@ -269,23 +308,24 @@ function createCardEntry(num: number, cardData: CardRecord) {
   quantityInput.title = 'Number of printed copies (0–100). Use 0 to exclude this card.';
   quantityInput.addEventListener('input', () => {
     const value = quantityInput.validity.valid ? String(quantityInput.valueAsNumber) : quantityInput.value;
-    saveCardText(num, 'quantity', value);
+    saveCardText(rowId, entrySession, 'quantity', value);
   });
   quantityInput.addEventListener('change', () => quantityInput.reportValidity());
   quantityCell.appendChild(quantityInput); entry.appendChild(quantityCell);
 
   for (let i = 0; i < cardFields.length; i++) {
-    if (cardFields[i].type == "text") {
+    const field = cardFields[i];
+    if (field.type == "text") {
       let div = document.createElement("div");
       div.classList.add("card-text");
 
       let input = document.createElement("textarea");
       input.rows = 1;
-      input.setAttribute('aria-label', `${cardFields[i].name.substring(1)} for card ${num}`);
-      if (Object.prototype.hasOwnProperty.call(cardData, cardFields[i].name)) {
-        input.value = cardData[cardFields[i].name];
+      input.setAttribute('aria-label', `${field.name.substring(1)} for card ${num}`);
+      if (Object.prototype.hasOwnProperty.call(cardData, field.name)) {
+        input.value = cardData[field.name];
       }
-      input.addEventListener("blur", () => { saveCardText(num, cardFields[i].name, input.value) });
+      input.addEventListener("input", () => { saveCardText(rowId, entrySession, field.name, input.value) });
       div.appendChild(input);
 
       entry.appendChild(div);
@@ -302,17 +342,19 @@ function createCardEntry(num: number, cardData: CardRecord) {
       div.appendChild(fileInput);
 
 
-      if (cardData[cardFields[i].name]) {
-        let assetId = cardData[cardFields[i].name].split("|")[1];
+      if (cardData[field.name]) {
+        let assetId = cardData[field.name].split("|")[1];
         img.src = assetsUrl + assetId;
         div.classList.add("card-image-full");
       } else {
         img.src = "images/add_image.png";
       }
 
-      div.appendChild(img);
-      img.addEventListener("click", () => { fileInput.click() });
-      fileInput.addEventListener("change", (ev: Event) => { saveCardImage(num, cardFields[i].name, img, ev) });
+      const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'card-image-pick';
+      choose.setAttribute('aria-label', `Choose ${field.name.substring(1)} image for card ${num}`);
+      img.alt = ''; choose.appendChild(img); div.appendChild(choose);
+      choose.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener("change", (ev: Event) => { saveCardImage(rowId, entrySession, field.name, ev) });
 
       entry.appendChild(div);
     }
@@ -325,6 +367,7 @@ function createCardEntry(num: number, cardData: CardRecord) {
 function addEmptyCard() {
   const cardData = newManualCard(cardsData);
   cardsData.push(cardData);
+  rowIds.push(crypto.randomUUID());
   let entry = createCardEntry(cardsData.length, cardData);
   cardList?.appendChild(entry);
   updateCardsEmptyState();
@@ -335,6 +378,8 @@ function addEmptyCard() {
 
 function deleteCard(num: number) {
   cardsData.splice((num - 1), 1);
+  rowIds.splice(num - 1, 1);
+  imageTargets.retainRows(rowIds);
   saveCardsData();
   reloadCardEntries();
 }
@@ -342,63 +387,37 @@ function deleteCard(num: number) {
 function copyCard(num: number) {
   const card = duplicateManualCard(cardsData[num - 1], cardsData);
   cardsData.splice(num - 1, 0, card);
+  rowIds.splice(num - 1, 0, crypto.randomUUID());
   saveCardsData();
 
   reloadCardEntries();
 }
 
-function saveCardText(num: number, name: string, val: string) {
-  cardsData[num - 1][name] = val;
+function saveCardText(rowId: string, session: number, name: string, val: string) {
+  const index = rowIds.indexOf(rowId);
+  if (pageBinding.session !== session || index < 0) return;
+  cardsData[index][name] = val;
   saveCardsData();
 }
 
-/*
-function handleImagePreview(fileInput, previewContainer) {
-  const file = fileInput.files[0];
-
-  fileInput.dataset.dirty = true;
-
-  if (file) {
-    const reader = new FileReader();
-
-    reader.onload = (event) => {
-      const imageBlob = event.target.result;
-      const imageUrl = URL.createObjectURL(new Blob([imageBlob], { type: 'image/jpeg' }));
-
-      previewContainer.src = imageUrl;
-
-    };
-
-    reader.readAsArrayBuffer(file);
-  } else {
-    alert("Please select an image first!");
-  }
-}
-*/
-
-async function saveCardImage(num: number, name: string, img: HTMLImageElement, event: Event) {
+async function saveCardImage(rowId: string, session: number, name: string, event: Event) {
+  if (pageBinding.session !== session || !rowIds.includes(rowId)) return;
   const fileInput = event.target as HTMLInputElement;
-  if (fileInput?.files?.length) {
-    const file = fileInput?.files[0];
-
-    if (file) {
-      const buff = await file.arrayBuffer();
-      const data = new Uint8Array(buff);
-      const mimeType = file.type;
-
-      const imageUrl = URL.createObjectURL(new Blob([data], { type: mimeType }));
-      img.src = imageUrl;
-
-      if (img.parentNode instanceof HTMLElement) {
-        img.parentNode.classList.add("card-image-full");
-      }
-
-      sendMessage({ type: 'create-image-data', data: { data, mimeType, num, name, filename: file.name } });
-      fileInput.value = '';
-    }
-  }
+  const file = fileInput.files?.[0];
+  if (!file) return;
+  const target = { rowId, name, uploadId: crypto.randomUUID() };
+  const context = { ...pageBinding };
+  imageTargets.start(target);
+  try {
+    if (file.size > 32 * 1024 * 1024) throw new Error('Choose an image smaller than 32 MiB.');
+    const data = new Uint8Array(await file.arrayBuffer());
+    if (pageBinding.session !== context.session || !rowIds.includes(target.rowId) || !imageTargets.matches(target)) return;
+    sendMessage({ type: 'create-image-data', data: { ...target, data, mimeType: file.type, filename: file.name } });
+  } catch (error) {
+    imageTargets.finish(target);
+    if (pageBinding.session === context.session) showDeckError(error instanceof Error ? error.message : 'Could not read the image.');
+  } finally { fileInput.value = ''; }
 }
-
 
 
 
@@ -448,6 +467,7 @@ function updateCardsEmptyState() {
 }
 
 function invalidateOutput() {
+  editRevision++;
   pdfReady = false;
   document.getElementById('download-pdf')?.classList.add('hidden');
   setPdfStatus('');
@@ -491,7 +511,8 @@ function requestPdf() {
   showForgeError('');
   setPdfBusy(true);
   setPdfStatus('Preparing print PDF…');
-  sendMessage({ type: 'export-front-pdf', data: {
+  pdfOperation = { id: crypto.randomUUID(), revision: editRevision, session: pageBinding.session };
+  sendMessage({ type: 'export-front-pdf', requestId: pdfOperation.id, data: {
     cardsData,
     type: (document.getElementById('forge-type') as HTMLSelectElement).value,
     paper: (document.getElementById('forge-paper') as HTMLSelectElement).value,
@@ -499,10 +520,16 @@ function requestPdf() {
   } });
 }
 
-async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 'a4'; deckName: string; layout: string }) {
+async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 'a4'; deckName: string; layout: string }, operation: NonNullable<typeof pdfOperation>) {
   let url: string | undefined;
   try {
-    const bytes = await createSheetPdf(data.pages.map(page => new Uint8Array(page)), data.paper);
+    const assertCurrent = () => {
+      if (pdfOperation !== operation || editRevision !== operation.revision || pageBinding.session !== operation.session) throw new Error('The deck changed during export. Generate again before downloading.');
+    };
+    assertCurrent();
+    const images = data.pages.map(page => page instanceof Uint8Array ? page : new Uint8Array(page));
+    const bytes = await createSheetPdf(images, data.paper, { assertCurrent });
+    assertCurrent();
     if (bytes.byteLength > 256 * 1024 * 1024) throw new Error('The PDF exceeds the 256 MiB download limit.');
     url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
     const anchor = document.createElement('a');
@@ -513,9 +540,9 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
     anchor.remove();
     setPdfStatus('PDF ready. Print at Actual Size (100%), with no scaling.');
   } catch (error) {
-    showForgeError(error instanceof Error ? error.message : 'PDF download failed. Try again.');
+    if (pdfOperation === operation) showForgeError(error instanceof Error ? error.message : 'PDF download failed. Try again.');
   } finally {
-    setPdfBusy(false);
+    if (pdfOperation === operation) { pdfOperation = null; setPdfBusy(false); }
     if (url) setTimeout(() => URL.revokeObjectURL(url!), 30_000);
   }
 }
@@ -538,7 +565,7 @@ function changeForgeType(invalidate = true) {
   document.getElementById('forge-paper-row')?.classList.toggle('hidden', !isSheetMode(value));
   document.getElementById('forge-explain-warning')!.textContent = frontOnly
     ? `Replaces only this deck’s generated ${value.startsWith('backs-') ? 'Backs' : 'Fronts'} Output. Template and other boards stay intact.`
-    : 'WARNING: Old Output will be deleted.';
+    : 'Replaces only this deck’s generated Output. Unclaimed older output and other boards stay intact.';
   if (frontOnly) {
     const backOnly = value.startsWith('backs-');
     const count = printedCopies(cardsData);
@@ -588,13 +615,12 @@ function updateTemplateSize() {
 
 function initCards() {
   loadCardFields(false);
-  sendMessage({ type: 'load-template-size', data: null });
   document.getElementById('correct-poker-size')?.addEventListener('click', () => {
     (document.getElementById('correct-poker-size') as HTMLButtonElement).disabled = true;
     document.getElementById('template-size-note')?.classList.add('hidden');
     sendMessage({ type: 'correct-poker-size', data: null });
   });
-  sendMessage({ type: 'load-card-fields', data: "" });
+
   document.getElementById("add-card")?.addEventListener("click", () => { addEmptyCard() });
   document.getElementById('empty-add-card')?.addEventListener('click', addEmptyCard);
   document.getElementById("box-forge-cancel")?.addEventListener("click", () => {
@@ -644,6 +670,5 @@ window.onload = (_event) => {
   });
   renderHelpCardSizes();
 
-  sendMessage({ type: 'is-page-empty', data: "" });
-  sendMessage({ type: 'load-output-settings', data: '' });
+  sendMessage({ type: 'load-page', data: null });
 };

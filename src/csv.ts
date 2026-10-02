@@ -54,7 +54,13 @@ export function parseCsv(source: string): CsvTable {
   return { headers, rows: records };
 }
 
-export function writeCsv(headers: readonly string[], rows: readonly (readonly string[])[]): string {
+export function writeCsv(headers: readonly string[], rows: readonly (readonly string[])[], spreadsheetSafe = false): string {
   const encode = (value: string) => /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
-  return [headers, ...rows].map(row => row.map(encode).join(',')).join('\r\n') + '\r\n';
+  const spreadsheetText = (value: string) => {
+    // Spreadsheet exports are for viewing, not lossless Cardforge reimports.
+    // A leading tab inside quotes keeps Excel from evaluating formula text.
+    if (spreadsheetSafe && /^[\s\uFEFF]*[=+\-@＝＋－＠]|^[\t\r\n]/u.test(value)) return `"\t${value.replace(/"/g, '""')}"`;
+    return encode(value);
+  };
+  return [headers, ...rows].map(row => row.map(spreadsheetText).join(',')).join('\r\n') + '\r\n';
 }

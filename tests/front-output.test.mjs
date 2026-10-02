@@ -320,8 +320,8 @@ for (const orientation of ['portrait', 'landscape']) {
     }
     assert.equal(f.page.getShapeById(oldOutput.id),oldOutput);
     assert.equal(f.templateSize().canCorrectPoker,false);
-    assert.equal(f.undoBlocks.length,2);
-    assert.equal(f.undoBlocks[0][1],f.undoBlocks[1][1]);
+    assert.equal(f.undoBlocks.length,4);
+    assert.equal(f.undoBlocks[2][1],f.undoBlocks[3][1]);
     f.forge(mode,deck(9),{paper:'letter'});
     assert.equal(f.page.getShapeById(oldOutput.id),null);
     const cards = mode === 'fronts-single' ? f.output().children : f.output().children[0].children;

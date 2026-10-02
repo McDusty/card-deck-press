@@ -13,6 +13,7 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   let source = '', revision = 0, preview: ImportPreview | null = null;
   let mapping: ColumnMapping | undefined;
   let uploading = false;
+  let exportFilename = 'cardforge-deck.csv';
   const input = element<HTMLInputElement>('csv-file');
   const artworkInput = element<HTMLInputElement>('artwork-files');
   const apply = element<HTMLButtonElement>('csv-apply');
@@ -82,7 +83,8 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   apply.addEventListener('click', () => { if (preview && !preview.errors.length) { apply.disabled = true; hooks.send('csv-apply', preview.token); } });
   element('csv-cancel').addEventListener('click', close);
   element('csv-refresh').addEventListener('click', requestPreview);
-  element('csv-export').addEventListener('click', () => hooks.send('csv-export', null));
+  element('csv-export').addEventListener('click', () => { exportFilename = 'cardforge-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
+  element('csv-export-safe').addEventListener('click', () => { exportFilename = 'cardforge-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
   element('csv-restore').addEventListener('click', () => hooks.send('csv-restore', null));
   element('csv-sample').addEventListener('click', () => download('card_id,quantity,name\r\n001,1,Joker\r\n002,2,Queen\r\n', 'cardforge-sample.csv'));
   element('csv-add-artwork').addEventListener('click', () => { artworkInput.value = ''; artworkInput.click(); });
@@ -97,7 +99,8 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   });
   hooks.send('csv-status', null);
   return (type, value) => {
-    if (type === 'CSV_PREVIEW') display(value as ImportPreview);
+    if (type === 'CSV_RESET') { source = ''; revision++; preview = null; mapping = undefined; uploading = false; apply.disabled = true; close(); error(''); element('csv-filename').textContent = ''; element('csv-summary').textContent = ''; element('csv-mapping').replaceChildren(); element('csv-preview-table').replaceChildren(); }
+    else if (type === 'CSV_PREVIEW') display(value as ImportPreview);
     else if (type === 'CSV_APPLIED') { hooks.apply(value as CardRecord[]); hooks.invalidate(); close(); }
     else if (type === 'CSV_ERROR') {
       const data = value as { revision?: number; message: string };
@@ -105,7 +108,7 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
       uploading = false; apply.disabled = true; error(data.message);
       element('csv-deck-status').textContent = data.message;
       element('csv-deck-status').classList.remove('hidden');
-    } else if (type === 'CSV_EXPORT') download(value as string, 'cardforge-deck.csv');
+    } else if (type === 'CSV_EXPORT') download(value as string, exportFilename);
     else if (type === 'CSV_STATUS') {
       const data = value as { canRestore: boolean; stale: boolean };
       element<HTMLButtonElement>('csv-restore').disabled = !data.canRestore;

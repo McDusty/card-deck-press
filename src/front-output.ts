@@ -3,6 +3,8 @@ import type { CardRecord, FaceMode, PaperSize } from './output-options';
 import { calculateFrontLayout, PAGE_GAP } from './front-layout';
 import { calculateCutLines } from './cut-lines';
 import { isSheetMode, parseForgeRequest } from './output-options';
+import { cloneTracked } from './output-clone';
+import { readDeck } from './csv-import';
 
 const OWNER_KEY = 'front-output-owner';
 const STATE_KEY = 'front-output-state';
@@ -69,6 +71,12 @@ function ownedCompleteOutput(page: Page, id: string, owner: string): Board | nul
 }
 
 export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceMode, paper: PaperSize, cutLines: boolean, sourceCards: readonly CardRecord[] = cards): Board {
+  const undo = api.history.undoBlockBegin();
+  try { return buildFrontOutput(api, cards, mode, paper, cutLines, sourceCards); }
+  finally { api.history.undoBlockFinish(undo); }
+}
+
+function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceMode, paper: PaperSize, cutLines: boolean, sourceCards: readonly CardRecord[]): Board {
   const page = api.currentPage;
   if (!page) throw new Error('Open a Penpot page first.');
   const backOnly = mode.startsWith('backs-');
@@ -80,6 +88,8 @@ export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], m
   const layout = calculateFrontLayout(mode, front.width, front.height, outputCards.length, paper);
   if (!backOnly) validateFields(page, front, cards);
   const owner = `${page.id}:${front.id}`;
+  const previousId = page.getPluginData(currentKey);
+  const previousCleanup = page.getPluginData(cleanupKey);
   const current = ownedCompleteOutput(page, page.getPluginData(currentKey), owner);
   const position = { x: current?.x ?? front.x, y: current?.y ?? front.y + front.height + 400 };
   // Recover only our recorded old output; never infer ownership from a name.
@@ -118,8 +128,7 @@ export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], m
       const offset = pageIndex * layout.perPage;
       const pageCards = outputCards.slice(offset, offset + layout.perPage);
       for (const [slot, data] of pageCards.entries()) {
-        const card = front.clone() as Board;
-        created.push(card);
+        const card = cloneTracked(page, front, created) as Board;
         container.appendChild(card);
         card.name = `${backOnly ? 'Back' : 'Front'} ${String(offset + slot + 1).padStart(2, '0')}`;
         card.x = container.x + layout.startX + (slot % layout.columns) * (front.width + layout.gap);
@@ -148,6 +157,8 @@ export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], m
     page.setPluginData(cleanupKey, current?.id ?? '');
     page.setPluginData(currentKey, output.id);
   } catch (error) {
+    page.setPluginData(currentKey, previousId);
+    page.setPluginData(cleanupKey, previousCleanup);
     // Each clone is tracked before filling fields, including unattached failures.
     for (const shape of created.reverse()) {
       if (page.getShapeById(shape.id)) shape.remove();
@@ -166,11 +177,16 @@ export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], m
   return output;
 }
 
-export async function exportFrontSheets(api: Penpot, value: unknown): Promise<{ pages: Uint8Array[]; paper: PaperSize; deckName: string; layout: string }> {
+export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: () => boolean = () => true,
+  progress: (data: { current: number; total: number }) => void = data => api.ui.sendMessage({ type: 'PDF_EXPORT_PROGRESS', data })):
+  Promise<{ pages: Uint8Array[]; paper: PaperSize; deckName: string; layout: string }> {
   const request = parseForgeRequest(value);
   if (!isSheetMode(request.type)) throw new Error('Choose a six- or nine-card sheet layout.');
   const page = api.currentPage;
   if (!page) throw new Error('Open the deck page first.');
+  if (page.getPluginData('cardsData') && JSON.stringify(readDeck(page)) !== JSON.stringify(request.cardsData)) {
+    throw new Error('The deck changed. Forge again before downloading.');
+  }
   const backOnly = request.type.startsWith('backs-');
   const currentKey = backOnly ? 'back-output-current' : CURRENT_KEY;
   const front = getFrontTemplate(page, backOnly ? 'Back' : 'Front');
@@ -181,17 +197,24 @@ export async function exportFrontSheets(api: Penpot, value: unknown): Promise<{ 
   const sheets = output.children;
   if (sheets.length === 0 || sheets.some(shape => shape.type !== 'board')) throw new Error('The generated sheets changed. Forge again before downloading.');
   const pages: Uint8Array[] = [];
+  const savedCards = page.getPluginData('cardsData');
+  const metadata = page.getPluginData('csv-import-metadata');
+  const settings = page.getPluginData('outputSettings');
+  const stale = page.getPluginData('csv-output-stale');
   let byteCount = 0;
   for (const [index, sheet] of sheets.entries()) {
     try {
       const data = await sheet.export({ type: 'png', scale: 1 });
-      if (api.currentPage?.id !== page.id || page.getPluginData(currentKey) !== output.id || output.getPluginData(TEMPLATE_KEY) !== templateSignature(front)) {
+      if (!isCurrent() || api.currentPage?.id !== page.id || page.getPluginData(currentKey) !== output.id ||
+          output.getPluginData(TEMPLATE_KEY) !== templateSignature(front) || page.getPluginData('cardsData') !== savedCards ||
+          page.getPluginData('csv-import-metadata') !== metadata || page.getPluginData('outputSettings') !== settings ||
+          page.getPluginData('csv-output-stale') !== stale) {
         throw new Error('The deck changed during export. Forge again before downloading.');
       }
       byteCount += data.byteLength;
       if (byteCount > 256 * 1024 * 1024) throw new Error('The export exceeds the 256 MiB download limit.');
       pages.push(data);
-      api.ui.sendMessage({ type: 'PDF_EXPORT_PROGRESS', data: { current: index + 1, total: sheets.length } });
+      progress({ current: index + 1, total: sheets.length });
     } catch (error) {
       throw new Error(`Sheet ${index + 1}: ${error instanceof Error ? error.message : 'Rendering failed. Try downloading again.'}`);
     }

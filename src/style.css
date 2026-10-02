@@ -379,12 +379,13 @@ h3 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  visibility: hidden;
+  visibility: visible;
 }
 
-.card-actions div {
+.card-actions button {
   width: 20px;
   height: 20px;
+  border: 0; padding: 0; background-color: transparent;
   cursor: pointer;
 }
 
@@ -615,3 +616,6 @@ h3 {
 #csv-preview-table th, #csv-preview-table td { padding: 10px; border-bottom: 1px solid #ddd; text-align: left; white-space: pre-wrap; max-width: 300px; overflow-wrap: anywhere; }
 
 .card-text textarea { box-sizing: border-box; width: 150px; height: 40px; resize: vertical; white-space: pre-wrap; padding: 4px 8px; border: 1px solid #acd8d0; font: inherit; }
+
+.card-actions button:focus-visible, .card-image-pick:focus-visible { outline: 2px solid #1a5c52; outline-offset: 3px; }
+.card-image-pick { padding: 0; border: 0; background: transparent; cursor: pointer; }

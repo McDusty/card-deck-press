@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200..700&display=swap" rel="stylesheet">
   <title>CardForge</title>
   <script type="module" crossorigin src="/index.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-DoEd4Hq3.css">
+  <link rel="stylesheet" crossorigin href="/assets/index-r1qJqVfc.css">
 </head>
 
 <body>
@@ -120,6 +120,7 @@
           <p id="csv-deck-status" class="hidden" role="status"></p>
           <div class="csv-backup-actions">
             <button id="csv-export" type="button">Export CSV</button>
+            <button id="csv-export-safe" type="button">Export for spreadsheets</button>
             <button id="csv-restore" type="button" disabled>Restore previous import</button>
           </div>
         </div>
@@ -227,7 +228,7 @@
             <p id="forge-template-size"></p>
             <div id="forge-explain-type"></div>
             <div id="forge-explain-marks"></div>
-            <div id="forge-explain-warning">WARNING: Old outputs will be deleted</div>
+            <div id="forge-explain-warning">Replaces only this deck’s generated output. Other boards stay intact.</div>
           </div>
           <p id="forge-error" class="hidden" role="alert" aria-live="polite"></p>
           <p id="pdf-status" class="hidden" role="status" aria-live="polite"></p>
@@ -315,6 +316,7 @@
               </ul>
               <p><strong>Example:</strong> add one Healing card and set Quantity to <strong>10</strong>. Print sheets include ten copies without needing ten rows. Editing the row updates every copy the next time you generate cards.</p>
               <p>Quantities repeat cards in six-up, nine-up, back sheets, and fold-over layouts. Single-card, Standard, and Tabletop layouts include each nonzero design once. Older cards without a quantity count as 1.</p>
+              <p>Changing Penpot pages reloads the editor for the new page. Image uploads stay attached to their original card; uploads for a removed card or a previous page are discarded.</p>
               <p>Text fields support multiple lines. After a CSV import, you can also edit <strong>Card ID</strong>. Keep IDs unique when preparing another import. The CSV <code>quantity</code> column uses the same Quantity field.</p>
               <p>Card edits are saved on the Penpot page. When you are ready, open the <strong>Export tab</strong> at the top and click <strong>Generate Cards</strong>. Repeat this after editing cards to update the output.</p>
             </section>
@@ -384,7 +386,8 @@ Second line",dragon.png
               <p>Update your spreadsheet, keep the same IDs, and upload a new CSV. <strong>Apply replaces the whole list</strong>: cards absent from the new file are removed from the list.</p>
               <p>Existing generated boards stay in place after import. The <strong>out-of-date</strong> message means you need to generate cards again in Export.</p>
               <ul>
-                <li><strong>Export CSV:</strong> save the current card data for backup or spreadsheet editing. Cards without IDs receive generated IDs in the export.</li>
+                <li><strong>Export CSV:</strong> save the current card data for backup and reimporting. Cards without IDs receive generated IDs in the export.</li>
+                <li><strong>Export for spreadsheets:</strong> save a viewing copy with formula-like values treated as text. This adds leading tabs to those values. Use the original Export CSV for reimporting; spreadsheet applications may handle text protection differently.</li>
                 <li><strong>Restore previous import:</strong> restore one saved snapshot of the card data, mappings, and output settings.</li>
               </ul>
               <p>Restore does not undo template or artwork edits and does not regenerate output. Review the restored data, then generate cards again in Export. A later import replaces the stored snapshot.</p>
@@ -409,8 +412,9 @@ Second line",dragon.png
                   </tbody>
                 </table>
               </div>
-              <p><strong>Quantity 0</strong> excludes a card from every layout. Single-front, Standard, and Tabletop layouts include each nonzero design once. Print sheets repeat copies consecutively, in card-list order.</p>
-              <p>Fronts Output and Backs Output are independent: generating one keeps the other. A successful run replaces its own previous output. The older Standard, fold-over, and Tabletop modes share an Output frame that is replaced on each run.</p>
+              <p>Backs-only layouts use the shared Back template and the included card count. They do not require Front fields or front artwork.</p>
+              <p><strong>Quantity 0</strong> excludes a card and its artwork requirements from every layout. Single-front, Standard, and Tabletop layouts include each nonzero design once. Print sheets repeat copies consecutively, in card-list order.</p>
+              <p>Fronts Output and Backs Output are independent: generating one keeps the other. A successful run replaces its own previous output. Standard, fold-over, and Tabletop modes share their own generated Output frame. Only output owned by this deck is replaced, after the new output completes. Older unclaimed frames named Output are kept; remove them yourself if they are no longer needed. A failed run keeps the last completed output.</p>
             </section>
             <section id="help-print" aria-labelledby="help-print-heading">
               <h2 id="help-print-heading">Print, cut lines, and bleed</h2>
@@ -422,6 +426,7 @@ Second line",dragon.png
               </ul>
               <p>After generating a sheet in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains the sheets in order, on physically sized Letter or A4 pages.</p>
               <p>Print the PDF at <strong>Actual Size / 100%</strong>. Turn off Fit to Page. Measure a test card before printing the whole deck.</p>
+              <p>Editing cards while a PDF is being prepared cancels that download. Generate cards again to download the updated deck. Sheets are processed one at a time to reduce memory use. Very large files are stopped with a size error; reduce quantities or export a smaller selection of cards.</p>
               <p>PDF sheets contain 300-ppi images. For single-card images, use Penpot's export controls. Automatic PNG ZIP downloads are not available yet.</p>
               <p><strong>Bleed</strong> is artwork extending beyond the final cut edge. Cardforge's preset frames are the finished size and do not add a printer-specific bleed area. Use your printer's separate requirements when preparing commercial files.</p>
               <p>Keep important text and symbols away from the card edge so cutting differences do not remove them.</p>

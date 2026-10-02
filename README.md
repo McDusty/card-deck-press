@@ -21,7 +21,7 @@ Without Tilt, install dependencies with `npm ci` and build with `npm run build`.
 5. Add two cards with different names. Forge them using **Standard**. Check that both names appear in the output.
 6. Reopen Cardforge and confirm both cards were saved. Change one name, forge again, and confirm the output updates.
 
-Fronts-only and backs-only layouts, straight cut lines, and sheet PDF downloads are available for local testing. CSV import is available; PNG ZIP downloads remain pending. Use a scratch file because the legacy fronts-and-backs generator replaces its **Output** board on each run. After controller changes, close and reopen the plugin to load the new code. Manifest or permission changes may require reinstalling the local plugin.
+Fronts-only and backs-only layouts, straight cut lines, and sheet PDF downloads are available for local testing. CSV import is available; PNG ZIP downloads remain pending. All layouts replace only their own completed output after a replacement succeeds. Unclaimed older frames named **Output** are preserved; remove unwanted older frames manually. After controller changes, close and reopen the plugin to load the new code. Manifest or permission changes may require reinstalling the local plugin.
 
 If an HTTPS Penpot site cannot load localhost, check the browser's local network permission; Firefox is another option. See [Penpot's local plugin instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot) and [local network troubleshooting](https://help.penpot.app/mcp/#install-and-activate-1).
 
@@ -33,7 +33,7 @@ The **Help** tab is one scrollable guide with a clickable table of contents. It 
 2. Include a unique `card_id` for every row. Optional `quantity` defaults to 1, accepts 0–100, and 0 excludes the card from output. IDs such as `001` stay text.
 3. Map columns to `#` template fields, Card ID, Quantity, or Ignore. Matching names map automatically: `name` → `#name`. Review the first five rows, counts, errors, and added/changed/removed records.
 4. Click **Apply import** to replace the whole card list. Existing generated boards stay in place and are marked out of date. Open **Export** and click **Generate Cards** to regenerate them.
-5. Use **Export CSV** for a backup or spreadsheet editing. **Restore previous import** restores one saved dataset, mapping, and output-settings snapshot. It does not restore template or artwork edits or regenerate boards. Ignored CSV columns are discarded and do not appear in the export.
+5. Use **Export CSV** for a backup and reimporting. **Export for spreadsheets** makes a viewing copy with formula-like values protected as text using leading tabs; use the raw CSV for lossless reimports. Spreadsheet applications can handle that protection differently. **Restore previous import** restores one saved dataset, mapping, and output-settings snapshot. It does not restore template or artwork edits or regenerate boards. Ignored CSV columns are discarded and do not appear in the export.
 
 Quoted commas, quotes, Unicode, and multiline text are supported. Limits are 2 MiB, 100 columns, 500 records, and 1,000 printed copies. These are protective caps, not measured performance promises. Print sheets repeat quantities consecutively; single-card/standard/tabletop outputs include each nonzero design once. A single shared back still produces one back.
 
@@ -61,7 +61,9 @@ Output is named **Fronts Output** or **Backs Output**. Each replaces only its ow
 
 After forging a sheet layout, use **Download PDF** in the plugin. The file has exact Letter (612 × 792 points) or A4 page dimensions and contains the generated sheets in order. Print at **Actual Size / 100%**. The PDF embeds 300-ppi sheet images; it is not vector output. Reinstall the local manifest once if needed to approve the added download permission.
 
-Editable sheet boards retain the upstream 300-ppi canvas convention. Physical template migration, text-overflow validation, cancellation, large-deck benchmarks, and interrupted-run recovery remain pending. Browser download and real Penpot rendering still require live verification; automated tests use a simulated Penpot API. Avoid running a separate build while Tilt is rebuilding the same output folder; use `node --test tests/*.test.mjs` once Tilt is ready.
+Editable sheet boards retain the upstream 300-ppi canvas convention. Physical template migration, text-overflow validation, cancellation, real Penpot capacity benchmarks, and interrupted-run recovery remain pending. PDF assembly compresses and releases each decoded image before loading the next sheet. PNG dimensions are checked before decoding. Encoded input is capped at 256 MiB and embedded image streams at 128 MiB; PDF errors retain generated boards. Page and editor-session identities reject stale writes and uploads; edits invalidate pending downloads. Browser download and real Penpot rendering still require live verification; automated tests use a simulated Penpot API. Avoid running a separate build while Tilt is rebuilding the same output folder; use `node --test tests/*.test.mjs` once Tilt is ready.
+
+A synthetic Node check assembled 112 Letter sheets (1,000 nine-up copies) with about 257 MiB peak process memory. This checks PDF assembly with simple test images; it is not a browser or real-artwork capacity guarantee.
 
 Run `npm test` for the compiler, standalone controller build, and generation behavior tests. The controller is bundled separately as one script because Penpot cannot evaluate unresolved JavaScript module imports.
 
