@@ -3,7 +3,7 @@
 - **Product:** Card Deck Press
 - **Branch:** `codex/google-sheets-import`
 - **Date:** October 5, 2026
-- **Status:** Reviewed and revised implementation plan. Transport feasibility is the first implementation gate; feature work has not started.
+- **Status:** Standalone reader loop implemented, tested, and reviewed locally. Source persistence, transactions, and product UI remain pending. The full transport release gate remains open.
 - **Baseline:** `dd73875` on `origin/main` (840 px default plugin width).
 
 ## 1. Decision
@@ -192,6 +192,21 @@ Run the transport spike against a disposable shared worksheet. Record the chosen
 
 This proves anonymous local browser access and explicit tab selection for this workbook. Comparison against Google's anonymous CSV export does not independently prove original cell-format fidelity. Still required: controlled formatting fixtures (`001`, minority mixed-type cells, multiline/quoted/formula results and invalid headers), viewer download restrictions/revocation, repeat-read freshness, cancellation/stream limits, and an isolated HTTPS-hosted reader check. Do not label the entire Milestone 0 gate complete from these results alone.
 
+#### Reader loop — October 5, 2026
+
+Completed the standalone reader portion of Milestone 2 before source/UI integration:
+
+- `src/google-sheet-link.ts` validates normal links, preserves explicit worksheet selection, and derives canonical Google-only request URLs. Missing gid produces a specific worksheet instruction without fetching.
+- `src/google-sheets.ts` reads anonymously with cache disabled, follows the required Google export redirect, validates the final host and CSV response type, and returns string cells. Reads have an abortable 20-second default deadline, fatal UTF-8 decoding, and a streamed 2 MiB cap.
+- `src/csv.ts` now enforces the 100-column cap while parsing every row, alongside its existing byte and 500-record caps. Quantity, total-copy, card-ID, and artwork validation still belong to the existing import preview; the reader does not apply a deck.
+- 83 offline reader tests cover canonical links, malformed URLs, permissions/status failures, redirects, cell fidelity, exact byte boundaries, malformed encoding/CSV, cancellation, stalled bodies, and continuously ready streams. The complete build and regression suite passes 221 tests.
+- Two independent reviews covered transport/security and data/parser behavior. Both identified no remaining reader findings after fixes: valid HTML-like CSV headers now survive, and a monotonic deadline prevents ready stream chunks from starving the timeout timer.
+- A temporary read-only harness ran the actual reader in Chrome, then inside a localhost plugin iframe in the deployed HTTPS Penpot workspace. The selected worksheet returned 13 records, 14 columns, and 2,465 bytes; all headers/cells matched the anonymous export baseline. The normal link without gid produced the worksheet instruction; an invented gid produced the expected HTTP error without falling back. No card data was applied.
+
+HTML response types and HTML-prefixed bodies that fail CSV parsing are rejected. A body mislabeled as CSV can also be syntactically valid CSV; tag-like cells remain inert text. Require valid card-ID mapping before any preview can be applied rather than discarding valid user headers through HTML heuristics.
+
+This completes the reader implementation loop, not the full integration or release gate. Controlled Google formatting, sharing revocation/download restrictions, Google-side freshness, and the isolated HTTPS-hosted reader still need live checks before release. Temporary test assets and the zero-permission test plugin are removed after verification; the user's workbook link and contents are not committed.
+
 ### Milestone 1 — Source model and transactions
 
 - Add `src/deck-source.ts`: typed persisted source, runtime validation, canonical link parser, read/write helpers, source authority checks. Extend `src/deck-session.ts` with the non-restorable operation/source epoch.
@@ -246,7 +261,7 @@ No automated test should read a user's real Google Sheet. Stub network cases in 
 
 ## 9. Risks and decisions still to prove
 
-- Browser CSV transport for a normal shared link is not yet proven in this deployment.
+- Local browser CSV reads are proven for the shared test workbook, including the Penpot iframe. Controlled fidelity/permissions cases and an isolated HTTPS-hosted reader remain unverified.
 - Worksheet visibility/download policy can block reads even if the user can open the file while signed in.
 - Multi-user edits can race between a snapshot check and writes; document the supported optimistic-concurrency behavior and never claim a database-level transaction that Penpot does not expose.
 - The first release intentionally blocks an empty source rather than treating it as a request to delete every card.
