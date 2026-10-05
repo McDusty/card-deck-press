@@ -4,7 +4,7 @@
 
 **Card Deck Press** is a [Penpot](https://penpot.app/) plugin for designing and producing card decks, built from the original [Cardforge](https://github.com/PIWEEK/cardforge). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
 
-Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. Look for **Card Deck Press** in Penpot's plugin menu.
+Design a Front and shared Back template, add card details manually, from CSV, or through a connected Google Sheet, then generate individual cards or printable sheets. Look for **Card Deck Press** in Penpot's plugin menu.
 
 ## Install in Penpot
 
@@ -35,7 +35,7 @@ See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/
 | --- | --- |
 | Workflow | Dedicated Create Deck, Edit Deck, Export, and Help tabs separate template setup, card editing, generation, and guidance. |
 | Interface | Compact tabs, common actions at the top, simpler buttons, fewer decorative images, and helpful empty states. |
-| Deck data | CSV import with column mapping, validation, preview, and repeat imports using stable card IDs. Google Sheets works through downloaded CSV files. |
+| Deck data | CSV import and direct Google Sheets links with column mapping, validation, reviewed updates, and stable card IDs. |
 | Card quantities | A Quantity field lets one Healing row produce ten printed copies. CSV imports recognize the `quantity` header. |
 | Artwork | A visible Artwork frame stores reusable images. Card rows accept image names or selections from Artwork. Uploads preserve filenames for reuse and CSV matching. |
 | Card sizes | Corrected Poker and Tarot dimensions, 11 rectangular presets, custom sizes, and a Pixels / Inches / Millimeters selector. |
@@ -50,7 +50,7 @@ See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/
 The updated interface follows a clear sequence: **Create Deck → Edit Deck → Export**. Help is available in its own tab throughout the process.
 
 - **Separate steps:** create the templates first, enter card data in Edit Deck, then choose output settings and generate cards in Export. Printing controls no longer interrupt card editing.
-- **Common actions within reach:** Import CSV and Add Card stay at the top of Edit Deck. An empty card table also offers both actions, with consistent button labels.
+- **Common actions within reach:** Import CSV, Google Sheet, and Add Card stay at the top of local decks. Empty tables offer the same actions. Linked decks show Open Sheet and Pull Latest instead of manual editing.
 - **Clearer navigation:** compact tabs sit together at the top right. The creation guide links directly to Edit Deck, and Export includes a Back to Edit Deck button.
 - **Simpler presentation:** decorative character artwork and button outlines were removed. The creation panel starts with the form, followed by a short explanation of what to do next.
 - **Useful feedback:** template dimensions, import previews, validation errors, and out-of-date output notices explain what needs attention before generating or downloading.
@@ -60,7 +60,7 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 
 1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front's **inside** frame starts with a `#title` text layer and a black `#image` image placeholder. Back also has a black image placeholder inside its **inside** frame for your shared back design.
 2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
-3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
+3. Reopen the plugin and use **Edit Deck** to add cards manually, import CSV, or connect a Google Sheet. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
 4. Open **Export**, select a layout, and click **Generate Cards**. Single-card, six-up, nine-up, and fold-over layouts offer **Download PDF**. Export individual boards through Penpot.
 
 The **Back** is a shared design and does not support variable fields. The in-plugin **Help** tab contains the full workflow.
@@ -82,11 +82,26 @@ This example expects a text layer named `#name` and an image placeholder named `
 - **Quantity:** use whole numbers from 0 to 100. Zero excludes the card. Print sheets repeat copies; single-front, Standard, and Tabletop layouts include each nonzero design once.
 - **Export CSV:** keeps your card text unchanged. Use this for backups, editing, and importing back into the plugin. Ignored source columns are not retained.
 - **Export for spreadsheets:** also downloads a CSV, but adds a leading tab to values a spreadsheet might interpret as formulas, such as `+2 healing`. Use this as a viewing copy. The added tabs change those values, so use **Export CSV** for reimporting. Spreadsheet applications may handle this protection differently.
-- **Restore previous import:** restore one saved card-list, mapping, and output-settings snapshot. This does not restore artwork or template edits, or regenerate output.
+- **Restore Previous State:** restore one saved card-list, mapping, output-settings, and data-source snapshot after confirming the destination mode. This does not restore artwork or template edits, or regenerate output.
 
 Quoted commas, escaped quotes, Unicode, and multiline text are supported. Limits are **2 MiB per CSV, 100 columns, 500 records, and 1,000 printed copies**.
 
-For **Google Sheets**, download the sheet as CSV and import that file. Live Google Sheets connections and automatic synchronization are not implemented.
+## Google Sheets connections
+
+Each Penpot page can connect to one worksheet containing a header and at least one card row. Paste the normal Google Sheets URL in **Edit Deck → Google Sheet**; you do not need a CSV URL.
+
+1. In Sheets, choose **Share → General access → Anyone with the link → Viewer**. Allow viewer downloads. Private sheets requiring sign-in are not supported.
+2. Select the worksheet tab you want, then copy its URL including `gid=`.
+3. Paste the link and click **Read Sheet**. Map columns and review artwork matches, all changed card IDs, removals, and order changes.
+4. Click **Apply Changes** to replace the cards and save the connection. Until then, the previous deck and link remain in use.
+
+Connected rows are read-only. **Open Sheet** lets you add or edit cards in Google Sheets. **Pull Latest** reads the worksheet again and requires another reviewed apply. The plugin never writes to Sheets or polls automatically.
+
+**Change Link** previews a different worksheet before saving it. **Disconnect** keeps the cards and restores manual editing and CSV import. **Restore Previous State** confirms whether the backup restores a Sheets connection or local mode. Failed reads and invalid previews preserve the existing deck. Interrupted storage updates block changes until **Recover interrupted import** succeeds. Restore keeps one snapshot; the next meaningful import or connection change replaces it.
+
+Use unique, stable `card_id` values and optional `quantity` (whole numbers 0–100). Format IDs as plain text in Sheets before entering values such as `001`; Google exports displayed cell values. Image columns refer to existing **Artwork** names or paths, rather than remote image URLs. The CSV import limits also apply to Sheets. Artwork uploaded during preview stays in Artwork even if the import is canceled.
+
+An unchanged refresh updates its last-applied time without replacing the meaningful import backup or invalidating generated output. Regenerate output after a changed import.
 
 ## Set up a template image
 
@@ -102,7 +117,7 @@ Batch uploads support **100 images totaling 32 MiB**. Replace the fill on an exi
 
 ### Choose an image in a card row
 
-In **Edit Deck**, each image field offers:
+For locally edited decks in **Edit Deck**, each image field offers:
 
 - **Artwork image name:** type an exact filename or path, then press Enter or leave the field to match it.
 - **Pencil button:** open the image picker, search image names, and choose a thumbnail. Full paths distinguish duplicate filenames. Close the picker or press Escape to keep the current image.
@@ -200,7 +215,7 @@ Automated tests use a simulated Penpot API. Real Penpot rendering, browser downl
 
 ## Current limits and project notes
 
-Live Google Sheets synchronization, PNG ZIP downloads, text-overflow validation, cancellation controls, and interrupted-run recovery remain future work. PDFs are raster exports rather than vector documents. Existing editable boards retain the original 300-ppi canvas convention.
+Google Sheets updates are explicit pulls; automatic synchronization and private-sheet sign-in are not included. PNG ZIP downloads, text-overflow validation, generation cancellation, and recovery of interrupted generation remain future work. Import cancellation and interrupted import recovery are supported. PDFs are raster exports rather than vector documents. Existing editable boards retain the original 300-ppi canvas convention.
 
 - [Product requirements](docs/cardforge-prd.md)
 - [Feasibility and remaining checks](docs/feasibility.md)

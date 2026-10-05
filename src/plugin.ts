@@ -3,7 +3,7 @@ import { resolveDeckSize } from './card-sizes';
 import { Shape, Board } from '@penpot/plugin-types';
 import type { PluginUIEvent, DeckEvent, CardField } from './model';
 import { isFaceMode, parseForgeRequest } from './output-options';
-import { generateFrontOutput, exportFrontSheets } from './front-output';
+import { generateFrontOutput, exportFrontSheets, templateSignature } from './front-output';
 import { correctPokerTemplates, getTemplateSizeInfo } from './template-size';
 import { CsvImporter, validateImportedFields, readDeck, importFields } from './csv-import';
 import { cardsForOutput } from './deck-data';
@@ -14,26 +14,69 @@ import type { PageBinding } from './deck-session';
 import { ImageTargets } from './image-targets';
 import type { ImageTarget } from './image-targets';
 import { forgeLegacyCards } from './legacy-output';
+import { readSource, requireLocalSource, localSource, SOURCE_KEY } from './deck-source';
+import { deckFingerprint } from './deck-fingerprint';
+import { captureState, commitState, recoverState, requireRecovered, RECOVERY_KEY } from './deck-storage';
 const deckSession = new DeckSession(penpot);
 const imageTargets = new ImageTargets();
 const csvImporter = new CsvImporter(penpot);
-let pdfExporting = false;
+let pdfOperation: { id: string; context: PageBinding; fingerprint: string; deadline: number } | null = null;
+let pdfSerial = 0;
+let sheetRead: { context: PageBinding; state: string } | null = null;
+function pdfFingerprint(): string {
+    const page = penpot.currentPage;
+    if (!page) return '';
+    const templates = ('children' in page.root ? page.root.children : []).filter(shape => shape.type === 'board' && ['Front', 'Back', 'Artwork', '_Images'].includes(shape.name));
+    const outputs = ['front-output-current', 'back-output-current', 'legacy-output-current'].map(key => page.getPluginData(key)).map(id => id ? page.getShapeById(id) : null);
+    return JSON.stringify([deckFingerprint(page), templates.map(shape => templateSignature(shape as Board)), outputs.map(shape => shape?.type === 'board' ? [
+        shape.id, templateSignature(shape), ['front-output-state', 'front-output-owner', 'front-output-request', 'front-output-template', 'cardforge-legacy-state', 'cardforge-legacy-owner'].map(key => shape.getPluginData(key)),
+    ] : null)]);
+}
+function pdfLocked(): boolean {
+    if (pdfOperation && Date.now() > pdfOperation.deadline) {
+        const expired = pdfOperation; pdfOperation = null;
+        sendUi({ type: 'PDF_EXPORT_ERROR', data: 'PDF export timed out. Download again.', requestId: expired.id }, expired.context);
+    }
+    return Boolean(pdfOperation);
+}
+function advanceSource(): void {
+    csvImporter.invalidate(); sheetRead = null; imageTargets.clear(); deckSession.advance();
+    sendUi({ type: 'SOURCE_CONTEXT', data: deckSession.context });
+}
+function sourceStatus(): void {
+    const page = penpot.currentPage;
+    if (!page) { sendUi({ type: 'SHEET_STATUS', data: { source: localSource(), recovery: false } }); return; }
+    try { sendUi({ type: 'SHEET_STATUS', data: { source: readSource(page), recovery: Boolean(page.getPluginData(RECOVERY_KEY)), blocked: page.getPluginData(RECOVERY_KEY) ? 'Recover the interrupted import before changing this deck.' : undefined } }); }
+    catch (error) { sendUi({ type: 'SHEET_STATUS', data: { source: localSource(), recovery: Boolean(page.getPluginData(RECOVERY_KEY)), blocked: error instanceof Error ? error.message : 'Saved connection is invalid.' } }); }
+}
+function healthyDeck(): void {
+    const page = penpot.currentPage;
+    if (!page) throw new Error('Open a deck page first.');
+    requireRecovered(page); readSource(page);
+}
 function sendUi(message: PluginUIEvent, context = deckSession.context) {
     penpot.ui.sendMessage({ ...message, ...context });
+}
+function safeSettings(raw: string | undefined) {
+    try { return raw ? JSON.parse(raw) : { type: 'fronts-single', paper: 'letter', cutMarks: false }; }
+    catch { return { type: 'fronts-single', paper: 'letter', cutMarks: false }; }
 }
 function loadPage() {
     sendUi({ type: 'THEME_CHANGED', data: penpot.theme });
     sendUi({ type: 'PAGE_CONTEXT', data: deckSession.context });
-    loadCardsData();
+    sourceStatus();
+    try { loadCardsData(); }
+    catch (error) { sendUi({ type: 'DECK_ERROR', data: error instanceof Error ? error.message : 'Saved cards could not be read. Recover the interrupted import.' }); }
     loadCardFields();
     sendUi({ type: 'TEMPLATE_SIZE', data: getTemplateSizeInfo(penpot.currentPage) });
     sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
     handleIsPageEmpty();
     const settings = penpot.currentPage?.getPluginData('outputSettings');
-    sendUi({ type: 'OUTPUT_SETTINGS', data: settings ? JSON.parse(settings) : { type: 'fronts-single', paper: 'letter', cutMarks: true } });
+    sendUi({ type: 'OUTPUT_SETTINGS', data: safeSettings(settings) });
 }
 penpot.on('pagechange', () => {
     deckSession.changePage();
+    csvImporter.invalidate(); sheetRead = null; pdfOperation = null;
     imageTargets.clear();
     loadPage();
 });
@@ -232,6 +275,8 @@ async function createImage(value: unknown, context: PageBinding) {
         if (!penpot.currentPage || !importFields(penpot.currentPage).some(field => field.name === target!.name && field.type === 'image')) {
             throw new Error('The template image field changed. Reopen the plugin and choose the image again.');
         }
+        requireLocalSource(penpot.currentPage);
+        healthyDeck();
         const board = getArtworkBoard(penpot);
         const shape = penpot.createRectangle();
         try {
@@ -285,36 +330,82 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
         if (deckSession.context.pageId !== (penpot.currentPage?.id ?? null)) deckSession.changePage();
         loadPage(); return;
     }
-    const mutating = ['create-deck', 'save-cards-data', 'create-image-data', 'select-artwork', 'upload-artwork', 'forge-cards', 'export-front-pdf', 'correct-poker-size', 'csv-preview', 'csv-apply', 'csv-restore', 'csv-export'];
+    const mutating = ['create-deck', 'save-cards-data', 'create-image-data', 'select-artwork', 'upload-artwork', 'forge-cards', 'export-front-pdf', 'correct-poker-size', 'csv-preview', 'csv-apply', 'csv-restore', 'csv-export', 'sheet-begin', 'sheet-disconnect', 'source-recover', 'import-cancel', 'pdf-check'];
     if (mutating.includes(message.type)) {
-        try { deckSession.require(message); }
+        try {
+            deckSession.require(message);
+            if (!['sheet-disconnect', 'source-recover', 'import-cancel', 'pdf-check', 'csv-export'].includes(message.type)) healthyDeck();
+            if (['save-cards-data', 'create-image-data', 'select-artwork', 'csv-restore'].includes(message.type)) {
+                if (message.type !== 'csv-restore') requireLocalSource(penpot.currentPage!);
+            }
+        }
         catch (error) {
-            const type = message.type.startsWith('csv-') || message.type === 'upload-artwork' ? 'CSV_ERROR' : message.type === 'export-front-pdf' ? 'PDF_EXPORT_ERROR' : 'DECK_ERROR';
+            const type = message.type.startsWith('csv-') || message.type === 'upload-artwork' || message.type.startsWith('sheet-') || message.type === 'source-recover' || message.type === 'import-cancel' ? 'CSV_ERROR' : ['export-front-pdf', 'pdf-check'].includes(message.type) ? 'PDF_EXPORT_ERROR' : message.type === 'forge-cards' ? 'FORGE_ERROR' : 'DECK_ERROR';
             const text = error instanceof Error ? error.message : 'The active deck changed.';
+            if (['save-cards-data', 'forge-cards'].includes(message.type)) { try { loadCardsData(); } catch { /* Invalid stored rows remain blocked by source status. */ } }
+            sourceStatus();
             sendUi({ type, data: type === 'CSV_ERROR' ? { message: text } : text, requestId: message.requestId });
             return;
         }
     }
 
 
-    if (message.type === "create-deck") {
+    if (message.type === 'sheet-status') { sourceStatus();
+    } else if (message.type === 'pdf-finish') {
+        if (pdfOperation?.id === message.requestId && deckSession.matches(message)) pdfOperation = null;
+    } else if (message.type === 'pdf-check') {
+        const operation = pdfOperation;
+        if (pdfLocked() && operation && operation.id === message.requestId && deckSession.matches(operation.context) && operation.fingerprint === pdfFingerprint()) {
+            sendUi({ type: 'PDF_CHECKED', data: null, requestId: message.requestId });
+        } else {
+            if (operation?.id === message.requestId) pdfOperation = null;
+            sendUi({ type: 'PDF_EXPORT_ERROR', data: 'The deck changed during export. Generate again before downloading.', requestId: message.requestId });
+        }
+    } else if (['sheet-begin', 'sheet-disconnect', 'source-recover', 'import-cancel'].includes(message.type)) {
+        try {
+            if (pdfLocked()) throw new Error('Wait for the PDF download to finish.');
+            if (message.type === 'sheet-disconnect') {
+                const page = penpot.currentPage!; requireRecovered(page);
+                let revision = 0;
+                try { revision = readSource(page).revision + 1; } catch { revision = 1; }
+                commitState(page, { ...captureState(page), [SOURCE_KEY]: JSON.stringify(localSource(revision)) });
+            } else if (message.type === 'source-recover') recoverState(penpot.currentPage!);
+            advanceSource();
+            if (message.type === 'sheet-begin') {
+                sheetRead = { context: deckSession.context, state: JSON.stringify(captureState(penpot.currentPage!)) };
+                sendUi({ type: 'SHEET_STARTED', data: { requestId: message.data?.requestId } });
+            }
+            else if (message.type !== 'import-cancel') loadCardsData();
+            sourceStatus(); sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
+        } catch (error) { sendUi({ type: 'CSV_ERROR', data: { message: error instanceof Error ? error.message : 'Could not update the deck connection.' } }); sourceStatus(); }
+    } else if (message.type === "create-deck") {
         handleCreateDeck((message as DeckEvent));
     } else if (['csv-preview', 'csv-apply', 'csv-restore', 'csv-export', 'csv-status'].includes(message.type)) {
         try {
-            if (pdfExporting && message.type !== 'csv-status') throw new Error('Wait for the PDF download to finish.');
-            if (message.type === 'csv-preview') sendUi({ type: 'CSV_PREVIEW', data: csvImporter.preview(message.data) });
+            if (pdfLocked() && message.type !== 'csv-status') throw new Error('Wait for the PDF download to finish.');
+            if (message.type === 'csv-preview') {
+                if (message.data?.sheet && (!sheetRead || !deckSession.matches(sheetRead.context) || sheetRead.state !== JSON.stringify(captureState(penpot.currentPage!)))) {
+                    csvImporter.invalidate();
+                    throw new Error('The deck connection or cards changed while the sheet was loading. Pull Latest again.');
+                }
+                sendUi({ type: 'CSV_PREVIEW', data: csvImporter.preview(message.data) });
+            }
             else if (message.type === 'csv-export') sendUi({ type: 'CSV_EXPORT', data: csvImporter.export(message.data?.spreadsheetSafe === true) });
             else if (message.type === 'csv-status') sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
             else {
-                const cards = message.type === 'csv-apply' ? csvImporter.apply(message.data) : csvImporter.restore();
-                sendUi({ type: 'CSV_APPLIED', data: cards, rowIds: deckSession.replaceRows(cards.length) });
+                const cards = message.type === 'csv-apply' ? csvImporter.apply(message.data) : csvImporter.restore(message.data);
+                advanceSource();
+                sendUi({ type: 'CSV_APPLIED', data: cards, rowIds: deckSession.replaceRows(cards.length), changes: csvImporter.lastChange });
+                sourceStatus();
                 imageTargets.clear();
                 loadCardFields();
                 sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
                 const settings = penpot.currentPage?.getPluginData('outputSettings');
-                if (settings) sendUi({ type: 'OUTPUT_SETTINGS', data: JSON.parse(settings) });
+                if (settings) sendUi({ type: 'OUTPUT_SETTINGS', data: safeSettings(settings) });
             }
         } catch (error) {
+            sourceStatus();
+            if (message.type === 'csv-restore') sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
             sendUi({ type: 'CSV_ERROR', data: { revision: message.data?.revision, message: error instanceof Error ? error.message : 'CSV operation failed.' } });
         }
     } else if (message.type === 'upload-artwork') {
@@ -342,8 +433,9 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
         loadArtwork();
     } else if (message.type === "forge-cards") {
         try {
-            if (pdfExporting) throw new Error('Wait for the PDF download to finish.');
+            if (pdfLocked()) throw new Error('Wait for the PDF download to finish.');
             const request = parseForgeRequest(message.data);
+            if (penpot.currentPage && readSource(penpot.currentPage).mode === 'google-sheet' && JSON.stringify(request.cardsData) !== JSON.stringify(readDeck(penpot.currentPage))) throw new Error('The linked deck changed. Pull Latest or reload the card list before generating.');
             const outputCards = cardsForOutput(request.cardsData, request.type);
             if (penpot.currentPage && !request.type.startsWith('backs-')) validateImportedFields(penpot.currentPage, outputCards);
             if (isFaceMode(request.type)) {
@@ -359,22 +451,34 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             penpot.currentPage?.setPluginData('csv-output-stale', 'false');
             if (penpot.currentPage?.getPluginData('csv-import-metadata')) sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
         } catch (error) {
+            sourceStatus();
+            try { loadCardsData(); } catch { /* Invalid stored rows remain blocked by source status. */ }
             sendUi({ type: 'FORGE_ERROR', data: error instanceof Error ? error.message : 'Generation failed. Check your template and try again.' });
         }
     } else if (message.type === 'export-front-pdf') {
         const context = deckSession.context;
         const requestId = message.requestId;
-        if (pdfExporting) { sendUi({ type: 'PDF_EXPORT_ERROR', data: 'Wait for the previous PDF render to finish.', requestId }, context); return; }
-        pdfExporting = true;
-        exportFrontSheets(penpot, message.data, () => deckSession.matches(context), data => sendUi({ type: 'PDF_EXPORT_PROGRESS', data, requestId }, context))
-            .then(data => sendUi({ type: 'FRONT_PDF_IMAGES', data, requestId }, context))
-            .catch(error => sendUi({ type: 'PDF_EXPORT_ERROR', data: error instanceof Error ? error.message : 'PDF export failed. Try again.', requestId }, context))
-            .finally(() => { pdfExporting = false; });
+        if (pdfLocked()) { sendUi({ type: 'PDF_EXPORT_ERROR', data: 'Wait for the previous PDF render to finish.', requestId }, context); return; }
+        const operation = { id: requestId ?? `pdf-${++pdfSerial}`, context, fingerprint: pdfFingerprint(), deadline: Date.now() + 120_000 };
+        pdfOperation = operation;
+        // Bounded cleanup in real controllers; fixtures without timers still check the deadline on every action.
+        if (typeof setTimeout === 'function') setTimeout(() => {
+            if (pdfOperation === operation) { pdfOperation = null; sendUi({ type: 'PDF_EXPORT_ERROR', data: 'PDF export timed out. Download again.', requestId: operation.id }, context); }
+        }, 120_000);
+        exportFrontSheets(penpot, message.data, () => pdfOperation === operation && deckSession.matches(context) && Date.now() <= operation.deadline, data => sendUi({ type: 'PDF_EXPORT_PROGRESS', data, requestId }, context))
+            .then(data => {
+                if (pdfOperation !== operation || !deckSession.matches(context)) throw new Error('The deck changed during export. Forge again before downloading.');
+                sendUi({ type: 'FRONT_PDF_IMAGES', data, requestId }, context);
+            })
+            .catch(error => {
+                if (pdfOperation === operation) pdfOperation = null;
+                sendUi({ type: 'PDF_EXPORT_ERROR', data: error instanceof Error ? error.message : 'PDF export failed. Try again.', requestId }, context);
+            });
     } else if (message.type === 'load-template-size') {
         sendUi({ type: 'TEMPLATE_SIZE', data: getTemplateSizeInfo(penpot.currentPage) });
     } else if (message.type === 'correct-poker-size') {
         try {
-            if (pdfExporting) throw new Error('Wait for the PDF download to finish.');
+            if (pdfLocked()) throw new Error('Wait for the PDF download to finish.');
             sendUi({ type: 'POKER_SIZE_CORRECTED', data: correctPokerTemplates(penpot) });
         } catch (error) {
             sendUi({ type: 'TEMPLATE_SIZE_ERROR', data: error instanceof Error ? error.message : 'Size correction failed.' });

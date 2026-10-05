@@ -3,7 +3,7 @@
 - **Product:** Card Deck Press
 - **Branch:** `codex/google-sheets-import`
 - **Date:** October 5, 2026
-- **Status:** Standalone reader loop implemented, tested, and reviewed locally. Source persistence, transactions, and product UI remain pending. The full transport release gate remains open.
+- **Status:** The local feature is implemented, including connection UI, reviewed pulls, source persistence, transactional apply/restore, recovery, and controller authority. Build and 292 automated tests pass. Live visual validation and the full transport release gate remain open.
 - **Baseline:** `dd73875` on `origin/main` (840 px default plugin width).
 
 ## 1. Decision
@@ -290,7 +290,7 @@ Three independent reviewers examined the draft. No feature code changed during r
 | Output — Medium | Host PDF lock ends before iframe PDF assembly | Operation-ID completion/cancel acknowledgements and cleanup across both phases (§5) |
 | Concurrency — Medium | Cancel/Restore can leave live tokens or revive old requests | Non-restorable host epoch; invalidate tokens and fetches on all source transitions (§4) |
 
-**Review outcome:** Product and implementation contracts are ready to guide Milestone 0. Network feasibility remains unverified and must pass the explicit gate before building the full feature. The accepted first-release restrictions are shared Viewer access, an explicit worksheet tab, at least one card row, read-only linked rows, one recovery snapshot, and manual pulls.
+**Initial plan review outcome:** Product and implementation contracts were ready to guide Milestone 0. Network feasibility required the explicit transport gate; the later local reader results are recorded above. The accepted first-release restrictions are shared Viewer access, an explicit worksheet tab, at least one card row, read-only linked rows, one recovery snapshot, and manual pulls.
 
 **Second pass:** UX and transport reviewers confirmed their findings resolved. The state reviewer accepted the other amended contracts and requested durable recovery-record verification before any destructive write. This final correction is included in §5 and its failure tests.
 
@@ -303,3 +303,35 @@ Three independent reviewers examined the draft. No feature code changed during r
 - [Google: QUERY cell typing](https://support.google.com/docs/answer/3093343): mixed-type minority values can become null in query processing.
 - [Fetch standard](https://fetch.spec.whatwg.org/): redirect and cache behavior.
 - [Penpot: plugin architecture and manifests](https://help.penpot.app/plugins/getting-started/): iframe communication and permission model.
+
+## 11. Implementation review and regression checks
+
+The standalone reader is now connected to per-page source storage and the shared CSV preview/apply path. The controller binds reads to a monotonic host epoch and a persisted-state snapshot captured before network work. Linked card writes and stale generation payloads are rejected.
+
+Apply and Restore use versioned state snapshots and a separately verified durable recovery record. An incomplete rollback preserves that record and blocks mutations until recovery succeeds. Deliberate Disconnect can repair an unknown source schema while retaining existing cards.
+
+Two independent adversarial code reviews covered source authority/PDF races and storage/recovery. The following findings were fixed and checked with focused regression tests:
+
+| Finding | Fix |
+| --- | --- |
+| Reordered columns changed object-key order in returned rows and broke generation after a no-op pull | Return authoritative persisted rows; compare printed inputs semantically |
+| An old network read could override another editor's source change | Capture persisted source/cards before fetch and reject changed state before preview |
+| Timestamp-only refresh could cancel an identical PDF | Separate output/source authority fingerprints from read timestamps |
+| Failed Disconnect from an invalid source could trap recovery | Restore exact raw prior source while keeping its invalid-source guard; allow Disconnect retry |
+| Equal-value remapping lost the prior mapping's restore point | Treat relevant mapping changes as meaningful and preserve their backup |
+
+A final UI/controller adversarial pass found and resolved these issues:
+
+| Finding | Fix |
+| --- | --- |
+| Disconnect or Restore confirmation could follow a page or source-context change | Capture the reviewed page/session/epoch; close stale dialogs and reject stale confirmations |
+| Another editor could replace the backup after the Restore dialog opened | Capture an opaque restore token tied to the exact backup; reject changed backups and refresh the next review target |
+| Late rejected CSV/artwork file reads could overwrite another page's preview | Check the captured context and import revision in success and error paths |
+| Rejected generation could leave stale rows/source controls or a stuck loading state | Reload authoritative cards/source and use FORGE_ERROR for generation failures |
+| Source changes could leave local row callbacks bound to an old epoch | Re-render rows on SOURCE_CONTEXT; ignore the old callbacks |
+
+The compiler and Tilt-managed build pass. The final automated suite passes **292 tests**, including 49 Sheets integration checks and 22 UI regression checks. Tests use simulated decks and stubbed transport; they never fetch a user's sheet. An independent follow-up review confirmed the final findings resolved.
+
+Tilt's existing `card-deck-press` resource is ready at `http://localhost:4400/`. Reopen that local plugin in Penpot to load the new UI/controller. GitHub Pages remains unchanged until the branch is released.
+
+Browser access to localhost was denied by the tool's approval check during this run. No full-flow visual test, keyboard/theme check, or new real-sheet import was completed in this run. The earlier read-only transport evidence remains valid only within its recorded scope. The controlled Google formatting, sharing restriction/revocation, repeat-read freshness, and isolated HTTPS deployment checks remain open before release.

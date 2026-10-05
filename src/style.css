@@ -168,3 +168,14 @@ button.is-busy { pointer-events: none; }
 @media (prefers-reduced-motion: reduce) {
   .is-busy::before { animation: none; }
 }
+
+.sheet-source { padding: 12px 16px; margin: 12px 0; border-left: 3px solid var(--background-quaternary); background: var(--background-tertiary); }
+.sheet-source p { margin-top: 0; }
+#sheet-link { display: block; width: 100%; box-sizing: border-box; margin: 8px 0; }
+#sheet-error { color: var(--error-500); white-space: pre-wrap; }
+#csv-changes details { margin: 8px 0; }
+#csv-changes p { overflow-wrap: anywhere; }
+.card-image-readonly { display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+input[readonly], textarea[readonly] { background: var(--background-tertiary); }
+dialog { max-width: 480px; background: var(--background-primary); color: var(--foreground-primary); border: 1px solid var(--background-quaternary); padding: 24px; }
+dialog::backdrop { background: rgba(0, 0, 0, .4); }

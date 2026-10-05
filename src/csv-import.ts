@@ -3,6 +3,9 @@ import type { CardRecord } from './output-options';
 import { listArtwork, matchArtwork } from './artwork';
 import { parseCsv, writeCsv } from './csv';
 import { cardQuantity, printedCopies } from './deck-data';
+import { readSource, parseSource, sameSource, localSource, SOURCE_KEY } from './deck-source';
+import type { DeckSource, SheetSource } from './deck-source';
+import { BACKUP_KEY, RECOVERY_KEY, captureState, commitState, decodeBackup, parseCards, requireRecovered, validateMetadata } from './deck-storage';
 
 export interface ImportField { name: string; type: string; ids: string[] }
 export type ColumnMapping = Record<string, string>;
@@ -10,12 +13,12 @@ export interface ImportMetadata { mapping: ColumnMapping; fields: ImportField[] 
 export interface ImportPreview {
   revision: number; token: number; headers: string[]; fields: ImportField[]; mapping: ColumnMapping;
   rows: { line: number; values: string[] }[]; records: number; copies: number;
-  added: number; changed: number; removed: number; errors: string[]; artworkMatches: number;
+  added: number; changed: number; removed: number; addedIds: string[]; changedIds: string[]; removedIds: string[]; orderChanged: boolean; errors: string[]; artworkMatches: number;
 }
 const META = 'csv-import-metadata';
-const BACKUP = 'csv-import-backup';
+const BACKUP = BACKUP_KEY;
 const STALE = 'csv-output-stale';
-const KEYS = ['cardsData', META, 'outputSettings'] as const;
+
 
 function walk(shape: Shape): Shape[] { return [shape, ...('children' in shape ? shape.children.flatMap(walk) : [])]; }
 export function importFields(page: Page): ImportField[] {
@@ -33,18 +36,14 @@ export function importFields(page: Page): ImportField[] {
 }
 
 export function readDeck(page: Page): CardRecord[] {
-  const stored = page.getPluginData('cardsData');
-  if (!stored) return [];
-  let value: unknown = JSON.parse(stored);
-  if (typeof value === 'string') value = JSON.parse(value);
-  if (!Array.isArray(value) || value.some(card => !card || typeof card !== 'object' || Array.isArray(card) || Object.values(card).some(value => typeof value !== 'string'))) throw new Error('Saved card data is invalid. Export a backup before replacing it.');
-  return value as CardRecord[];
+  return parseCards(page.getPluginData('cardsData'));
 }
 function readMetadata(page: Page): ImportMetadata | null {
   const data = page.getPluginData(META);
+  validateMetadata(data);
   return data ? JSON.parse(data) as ImportMetadata : null;
 }
-function snapshot(page: Page): string { return JSON.stringify(Object.fromEntries(KEYS.map(key => [key, page.getPluginData(key)]))); }
+function snapshot(page: Page): string { return JSON.stringify(captureState(page)); }
 const sameCard = (a: CardRecord, b: CardRecord) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
 const normal = (value: string) => value.replace(/^#/, '').toLocaleLowerCase('en-US');
 
@@ -66,8 +65,11 @@ export function validateImportedFields(page: Page, cards: readonly CardRecord[] 
 
 export class CsvImporter {
   private serial = 0;
-  private pending: { pageId: string; token: number; source: string; mapping: ColumnMapping; snapshot: string; cards: CardRecord[]; fields: ImportField[]; artwork: string } | null = null;
+  private restoreTicket: { pageId: string; raw: string; token: number } | null = null;
+  private pending: { pageId: string; token: number; source: string; mapping: ColumnMapping; snapshot: string; cards: CardRecord[]; fields: ImportField[]; artwork: string; sheet: SheetSource | null } | null = null;
+  lastChange = { outputChanged: false, sourceChanged: false, metadataOnly: false };
   constructor(private readonly api: Penpot) {}
+  invalidate(): void { this.pending = null; }
   preview(value: unknown): ImportPreview {
     this.pending = null;
     if (!value || typeof value !== 'object') throw new Error('Choose a CSV file.');
@@ -75,9 +77,15 @@ export class CsvImporter {
     if (typeof input.source !== 'string' || typeof input.revision !== 'number') throw new Error('Choose a CSV file.');
     const page = this.api.currentPage;
     if (!page) throw new Error('Open a deck page first.');
+    requireRecovered(page);
+    const currentSource = readSource(page);
+    const draft = input.sheet === undefined ? null : parseSource(input.sheet);
+    if (draft && draft.mode !== 'google-sheet') throw new Error('Choose a Google Sheet.');
+    const sheet = draft as SheetSource | null;
+    if (!sheet && currentSource.mode !== 'local') throw new Error('Disconnect this deck before importing CSV.');
     const table = parseCsv(input.source);
     const fields = importFields(page);
-    const previous = readMetadata(page);
+    const previous = !sheet || sameSource(currentSource, sheet) ? readMetadata(page) : null;
     const errors: string[] = [];
     const mapping: ColumnMapping = Object.create(null);
     const supplied = input.mapping;
@@ -129,13 +137,20 @@ export class CsvImporter {
     if (!errors.length) copies = printedCopies(cards);
     if (copies > 1000) errors.push('This import exceeds 1,000 printed copies. Reduce quantities.');
     const old = readDeck(page);
-    const oldById = new Map(old.filter(card => card.card_id).map(card => [card.card_id, card]));
-    const added = cards.filter(card => !oldById.has(card.card_id)).length;
-    const changed = cards.filter(card => oldById.has(card.card_id) && !sameCard(card, oldById.get(card.card_id)!)).length;
-    const removed = old.filter(card => !card.card_id || !ids.has(card.card_id)).length;
+    const idCounts = new Map<string, number>();
+    for (const card of old) if (card.card_id) idCounts.set(card.card_id, (idCounts.get(card.card_id) ?? 0) + 1);
+    const oldById = new Map(old.filter(card => card.card_id && idCounts.get(card.card_id) === 1).map(card => [card.card_id, card]));
+    const addedIds = cards.filter(card => !oldById.has(card.card_id)).map(card => card.card_id);
+    const changedIds = cards.filter(card => oldById.has(card.card_id) && !sameCard(card, oldById.get(card.card_id)!)).map(card => card.card_id);
+    const removedIds = old.flatMap((card, index) => !card.card_id || !ids.has(card.card_id) || idCounts.get(card.card_id)! > 1
+      ? [!card.card_id ? `Local row ${index + 1}` : idCounts.get(card.card_id)! > 1 ? `Local row ${index + 1} (duplicate ID ${card.card_id})` : card.card_id] : []);
+    const added = addedIds.length, changed = changedIds.length, removed = removedIds.length;
+    const oldOrder = old.filter(card => oldById.has(card.card_id) && ids.has(card.card_id)).map(card => card.card_id);
+    const newOrder = cards.filter(card => oldById.has(card.card_id)).map(card => card.card_id);
+    const orderChanged = JSON.stringify(oldOrder) !== JSON.stringify(newOrder);
     const token = ++this.serial;
-    if (!errors.length) this.pending = { pageId: page.id, token, source: input.source, mapping, snapshot: snapshot(page), cards, fields: mappedFields, artwork: JSON.stringify(assets) };
-    return { revision: input.revision, token, headers: table.headers, fields, mapping, rows: table.rows.slice(0, 5), records: cards.length, copies, added, changed, removed, errors: errors.slice(0, 50), artworkMatches };
+    if (!errors.length) this.pending = { pageId: page.id, token, source: input.source, mapping, snapshot: snapshot(page), cards, fields: mappedFields, artwork: JSON.stringify(assets), sheet };
+    return { revision: input.revision, token, headers: table.headers, fields, mapping, rows: table.rows.slice(0, 5), records: cards.length, copies, added, changed, removed, addedIds, changedIds, removedIds, orderChanged, errors: errors.slice(0, 50), artworkMatches };
   }
   apply(token: unknown): CardRecord[] {
     const pending = this.pending;
@@ -143,39 +158,35 @@ export class CsvImporter {
     if (!pending || pending.token !== token || !page || page.id !== pending.pageId) throw new Error('Preview the CSV again before applying it.');
     if (snapshot(page) !== pending.snapshot || JSON.stringify(listArtwork(page)) !== pending.artwork || pending.fields.some(field => !importFields(page).some(current => JSON.stringify(current) === JSON.stringify(field)))) throw new Error('The deck, template, or artwork changed. Preview the CSV again.');
     this.pending = null;
-    const before = snapshot(page);
-    const oldBackup = page.getPluginData(BACKUP);
-    try {
-      page.setPluginData(BACKUP, before);
-      page.setPluginData(META, JSON.stringify({ mapping: pending.mapping, fields: pending.fields }));
-      page.setPluginData('cardsData', JSON.stringify(JSON.stringify(pending.cards)));
-      page.setPluginData(STALE, 'true');
-    } catch (error) {
-      const saved = JSON.parse(before) as Record<string, string>;
-      for (const key of KEYS) page.setPluginData(key, saved[key]);
-      page.setPluginData(BACKUP, oldBackup);
-      throw error;
-    }
-    return pending.cards;
+    requireRecovered(page);
+    const before = captureState(page);
+    const priorSource = readSource(page);
+    const sourceChanged = !sameSource(priorSource, pending.sheet ?? localSource());
+    const source: DeckSource = pending.sheet ? { ...pending.sheet, readAt: pending.sheet.lastApplied, lastApplied: new Date().toISOString(), revision: priorSource.revision + (sourceChanged ? 1 : 0) } : priorSource;
+    const metadata = JSON.stringify({ mapping: pending.mapping, fields: pending.fields });
+    const old = readDeck(page);
+    const outputChanged = old.length !== pending.cards.length || old.some((card, i) => !sameCard(card, pending.cards[i])) ||
+      JSON.stringify(readMetadata(page)?.fields ?? []) !== JSON.stringify(pending.fields) ||
+      JSON.stringify(Object.entries(readMetadata(page)?.mapping ?? {}).sort()) !== JSON.stringify(Object.entries(pending.mapping).sort());
+    this.lastChange = { outputChanged, sourceChanged, metadataOnly: !outputChanged && !sourceChanged };
+    commitState(page, { ...before, [META]: metadata, cardsData: outputChanged ? JSON.stringify(JSON.stringify(pending.cards)) : before.cardsData,
+      [SOURCE_KEY]: JSON.stringify(source), [STALE]: outputChanged ? 'true' : before[STALE] }, outputChanged || sourceChanged);
+    return readDeck(page);
   }
-  restore(): CardRecord[] {
+  restore(token: unknown): CardRecord[] {
     const page = this.api.currentPage;
     if (!page) throw new Error('Open a deck page first.');
+    requireRecovered(page);
     const backup = page.getPluginData(BACKUP);
     if (!backup) throw new Error('There is no previous import to restore.');
-    const saved = JSON.parse(backup) as Record<string, string>;
-    const current = snapshot(page);
-    try {
-      for (const key of KEYS) page.setPluginData(key, saved[key] ?? '');
-      page.setPluginData(BACKUP, current);
-      page.setPluginData(STALE, 'true');
-    } catch (error) {
-      const original = JSON.parse(current) as Record<string, string>;
-      for (const key of KEYS) page.setPluginData(key, original[key]);
-      page.setPluginData(BACKUP, backup);
-      throw error;
-    }
+    const ticket = this.restoreTicket;
+    if (!ticket || token !== ticket.token || ticket.pageId !== page.id || ticket.raw !== backup) throw new Error('The previous import changed. Review Restore Previous State again before restoring.');
+    const saved = decodeBackup(backup);
+    this.restoreTicket = null;
     this.pending = null;
+    const before = captureState(page);
+    this.lastChange = { outputChanged: true, sourceChanged: before[SOURCE_KEY] !== saved[SOURCE_KEY], metadataOnly: false };
+    commitState(page, { ...saved, [STALE]: 'true' });
     return readDeck(page);
   }
   export(spreadsheetSafe = false): string {
@@ -192,5 +203,22 @@ export class CsvImporter {
       return [id, card.quantity ?? '1', ...fieldNames.map(name => imageFields.includes(name) && card[name] ? assets.find(asset => asset.reference.split('|')[0] === card[name].split('|')[0])?.path ?? 'MISSING_ARTWORK' : card[name] ?? '')];
     }), spreadsheetSafe);
   }
-  status() { const page = this.api.currentPage; return { canRestore: Boolean(page?.getPluginData(BACKUP)), stale: page?.getPluginData(STALE) === 'true' }; }
+  status() {
+    const page = this.api.currentPage;
+    let restoreTarget: { mode: string; openUrl?: string } | null = null;
+    let restoreError: string | undefined;
+    const backup = page?.getPluginData(BACKUP);
+    if (page && backup) {
+      try {
+        const state = decodeBackup(backup);
+        const source = state[SOURCE_KEY] ? parseSource(JSON.parse(state[SOURCE_KEY])) : localSource();
+        restoreTarget = source.mode === 'google-sheet' ? { mode: source.mode, openUrl: source.openUrl } : { mode: source.mode };
+      } catch (error) { restoreError = error instanceof Error ? error.message : 'Backup is invalid.'; }
+    }
+    const canRestore = Boolean(restoreTarget) && !page?.getPluginData(RECOVERY_KEY);
+    if (canRestore && page && backup) {
+      if (this.restoreTicket?.pageId !== page.id || this.restoreTicket.raw !== backup) this.restoreTicket = { pageId: page.id, raw: backup, token: ++this.serial };
+    } else this.restoreTicket = null;
+    return { canRestore, restoreToken: this.restoreTicket?.token ?? null, stale: page?.getPluginData(STALE) === 'true', restoreTarget, restoreError };
+  }
 }

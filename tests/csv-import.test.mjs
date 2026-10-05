@@ -58,8 +58,8 @@ test('failed restoration rolls back dataset, mappings, settings and backup', () 
   result=preview(f,'card_id,name\n001,Updated'); f.message('csv-apply',result.data.token);
   const keys=['cardsData','csv-import-metadata','outputSettings','csv-import-backup'];
   const before=keys.map(key=>f.page.getPluginData(key)); const write=f.page.setPluginData; let fail=true;
-  f.page.setPluginData=(key,value)=>{if(key==='outputSettings' && fail){fail=false;throw new Error('Injected write failure');}write(key,value);};
-  f.message('csv-restore',null); assert.equal(f.messages.at(-1).type,'CSV_ERROR');
+  f.page.setPluginData=(key,value)=>{if(key==='cardsData' && fail){fail=false;throw new Error('Injected write failure');}write(key,value);};
+  f.restore(); assert.equal(f.messages.at(-1).type,'CSV_ERROR');
   assert.deepEqual(keys.map(key=>f.page.getPluginData(key)),before);
 });
 for(const source of ['', 'card_id,name\n', 'card_id,Name,name\n1,a,b', 'card_id,\n1,b', 'card_id,name\n1,b,c', 'card_id,name\n1,"open', 'card_id,name\n1,b"ad', 'card_id,name\n1,"ok"bad']) {
@@ -120,7 +120,7 @@ test('reimport reports added/changed/removed and restoration recovers data and s
  const f=fixture();f.page.setPluginData('outputSettings',JSON.stringify({type:'fronts-9',paper:'letter'}));
  let result=preview(f,'card_id,name\n001,A\n002,B');f.message('csv-apply',result.data.token);
  result=preview(f,'card_id,name\n001,Updated\n003,C');assert.equal(result.data.added,1);assert.equal(result.data.changed,1);assert.equal(result.data.removed,1);f.message('csv-apply',result.data.token);
- f.page.setPluginData('outputSettings','changed');f.message('csv-restore',null);assert.equal(saved(f)[0]['#name'],'A');assert.equal(saved(f)[1].card_id,'002');assert.match(f.page.getPluginData('outputSettings'),/fronts-9/);
+ f.page.setPluginData('outputSettings','changed');f.restore();assert.equal(saved(f)[0]['#name'],'A');assert.equal(saved(f)[1].card_id,'002');assert.match(f.page.getPluginData('outputSettings'),/fronts-9/);
  const exported=f.message('csv-export',null);assert.equal(exported.type,'CSV_EXPORT');assert.equal(parseCsv(exported.data).rows[0].values[0],'001');
 });
 

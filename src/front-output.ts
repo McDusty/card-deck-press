@@ -5,6 +5,7 @@ import { calculateCutLines } from './cut-lines';
 import { isFaceMode, isSheetMode, parseForgeRequest } from './output-options';
 import { cloneTracked } from './output-clone';
 import { readDeck } from './csv-import';
+import { deckFingerprint } from './deck-fingerprint';
 
 const OWNER_KEY = 'front-output-owner';
 const STATE_KEY = 'front-output-state';
@@ -203,18 +204,13 @@ export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: 
   const sheets = output.children;
   if (sheets.length === 0 || sheets.some(shape => shape.type !== 'board')) throw new Error('The generated sheets changed. Forge again before downloading.');
   const pages: Uint8Array[] = [];
-  const savedCards = page.getPluginData('cardsData');
-  const metadata = page.getPluginData('csv-import-metadata');
-  const settings = page.getPluginData('outputSettings');
-  const stale = page.getPluginData('csv-output-stale');
+  const savedState = deckFingerprint(page);
   let byteCount = 0;
   for (const [index, sheet] of sheets.entries()) {
     try {
       const data = await sheet.export({ type: 'png', scale: 1 });
       if (!isCurrent() || api.currentPage?.id !== page.id || page.getPluginData(currentKey) !== output.id ||
-          output.getPluginData(TEMPLATE_KEY) !== signature() || page.getPluginData('cardsData') !== savedCards ||
-          page.getPluginData('csv-import-metadata') !== metadata || page.getPluginData('outputSettings') !== settings ||
-          page.getPluginData('csv-output-stale') !== stale) {
+          output.getPluginData(TEMPLATE_KEY) !== signature() || deckFingerprint(page) !== savedState) {
         throw new Error('The deck changed during export. Forge again before downloading.');
       }
       byteCount += data.byteLength;

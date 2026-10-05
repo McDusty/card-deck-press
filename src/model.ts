@@ -3,6 +3,8 @@ export interface BaseEvent {
     data: any;
     pageId?: string | null;
     session?: number;
+    epoch?: number;
+    changes?: { outputChanged: boolean; sourceChanged: boolean; metadataOnly: boolean };
     rowIds?: string[];
     requestId?: string;
 }

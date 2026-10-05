@@ -2,19 +2,28 @@ import { CSV_MAX_BYTES } from './csv';
 import type { ImportPreview, ColumnMapping } from './csv-import';
 import type { CardRecord } from './output-options';
 import { setBusy } from './busy-ui';
+import type { GoogleSheetRead } from './google-sheets';
+import type { PageBinding } from './deck-session';
+import { sameBinding } from './google-sheets-ui';
 
 interface Hooks {
-  send(type: string, data: unknown): void;
+  send(type: string, data: unknown, binding?: PageBinding): void;
+  context(): PageBinding;
   apply(cards: CardRecord[]): void;
   invalidate(): void;
 }
 const element = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 
-export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
+export function initCsvUi(hooks: Hooks) {
   let source = '', revision = 0, preview: ImportPreview | null = null;
   let mapping: ColumnMapping | undefined;
   let uploading = false;
   let exportFilename = 'card-deck-press-deck.csv';
+  let sheet: GoogleSheetRead | undefined;
+  let binding: PageBinding | undefined;
+  let restoreTarget: { mode: string; openUrl?: string } | null = null;
+  let restoreToken: number | null = null;
+  let restoreConfirmation: { binding: PageBinding; token: number } | null = null;
   const input = element<HTMLInputElement>('csv-file');
   const artworkInput = element<HTMLInputElement>('artwork-files');
   const apply = element<HTMLButtonElement>('csv-apply');
@@ -28,10 +37,15 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
     apply.disabled = true; preview = null; revision++;
     error(''); element('csv-summary').textContent = 'Checking CSV and artwork…';
     setBusy(element('csv-summary'), true);
-    hooks.send('csv-preview', { source, mapping, revision });
+    hooks.send('csv-preview', { source, mapping, revision, sheet: sheet ? { version: 1, mode: 'google-sheet', revision: 0, spreadsheetId: sheet.link.spreadsheetId, worksheetId: sheet.link.worksheetId, openUrl: sheet.link.openUrl, lastApplied: sheet.fetchedAt } : undefined }, binding);
   }
   function close() {
+    revision++; preview = null; uploading = false; source = ''; sheet = undefined; binding = undefined; apply.disabled = true;
     element('csv-panel').classList.add('hidden'); element('cards-container').classList.remove('hidden');
+  }
+  function closeRestore() {
+    restoreConfirmation = null;
+    element<HTMLDialogElement>('csv-restore-dialog').close();
   }
   function download(text: string, filename: string) {
     const url = URL.createObjectURL(new Blob(['\uFEFF', text], { type: 'text/csv;charset=utf-8' }));
@@ -43,7 +57,13 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
     if (data.revision !== revision) return;
     preview = data; mapping = data.mapping;
     setBusy(element('csv-summary'), false);
-    element('csv-summary').textContent = `${data.records} card records · ${data.copies} printed copies · ${data.artworkMatches} artwork matches.\n${data.added} added · ${data.changed} changed · ${data.removed} removed. Apply replaces the current card list.`;
+    element('csv-summary').textContent = `${data.records} card records · ${data.copies} printed copies · ${data.artworkMatches} artwork matches.\n${data.added} added · ${data.changed} changed · ${data.removed} removed. ${!data.added && !data.changed && !data.removed && !data.orderChanged ? 'No card changes.' : 'Apply replaces the current card list.'}`;
+    const changes = element('csv-changes'); changes.replaceChildren();
+    for (const [label, ids] of [['Added', data.addedIds], ['Changed', data.changedIds], ['Removed', data.removedIds]] as const) {
+      const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = `${label}: ${ids?.length ?? 0}`;
+      const list = document.createElement('p'); list.textContent = ids?.join(', ') || 'None'; details.append(summary, list); changes.appendChild(details);
+    }
+    if (data.orderChanged) { const note = document.createElement('p'); note.textContent = 'Card order changes. Print sheets follow the new row order.'; changes.appendChild(note); }
     const container = element('csv-mapping'); container.replaceChildren();
     for (const header of data.headers) {
       const row = document.createElement('label'); row.className = 'csv-mapping-row';
@@ -75,37 +95,53 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
     const file = input.files?.[0]; if (!file) return;
     element('csv-panel').classList.remove('hidden'); element('cards-container').classList.add('hidden');
     element('csv-filename').textContent = file.name; element('csv-preview-table').replaceChildren(); element('csv-mapping').replaceChildren();
-    source = ''; preview = null; mapping = undefined; revision++; const fileRevision = revision; apply.disabled = true;
+    sheet = undefined; binding = { ...hooks.context() }; const captured = binding; element('csv-heading').textContent = 'Import CSV'; element('csv-choose').classList.remove('hidden'); element('csv-sample').classList.remove('hidden'); source = ''; preview = null; mapping = undefined; revision++; const fileRevision = revision; apply.disabled = true;
     error(''); element('csv-summary').textContent = 'Reading CSV…'; setBusy(element('csv-summary'), true);
     try {
       if (file.size > CSV_MAX_BYTES) throw new Error('Choose a CSV smaller than 2 MiB.');
       const bytes = await file.arrayBuffer();
-      if (revision !== fileRevision) return;
+      if (revision !== fileRevision || !binding || !sameBinding(binding, hooks.context())) return;
       source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
       if (!source) throw new Error('The CSV is empty. Include a header row and at least one card.');
       requestPreview();
-    } catch (issue) { error(issue instanceof Error ? issue.message : 'Save the spreadsheet as UTF-8 CSV and try again.'); }
+    } catch (issue) { if (revision === fileRevision && sameBinding(captured, hooks.context())) error(issue instanceof Error ? issue.message : 'Save the spreadsheet as UTF-8 CSV and try again.'); }
   });
-  apply.addEventListener('click', () => { if (preview && !preview.errors.length) { apply.disabled = true; element('csv-summary').textContent = 'Applying import…'; setBusy(element('csv-summary'), true); hooks.send('csv-apply', preview.token); } });
-  element('csv-cancel').addEventListener('click', close);
+  apply.addEventListener('click', () => { if (preview && !preview.errors.length && binding && sameBinding(binding, hooks.context())) { apply.disabled = true; element('csv-summary').textContent = 'Applying import…'; setBusy(element('csv-summary'), true); hooks.send('csv-apply', preview.token, binding); } });
+  element('csv-cancel').addEventListener('click', () => { hooks.send('import-cancel', null); close(); });
   element('csv-refresh').addEventListener('click', requestPreview);
   element('csv-export').addEventListener('click', () => { setBusy(element('csv-export'), true); exportFilename = 'card-deck-press-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
   element('csv-export-safe').addEventListener('click', () => { setBusy(element('csv-export-safe'), true); exportFilename = 'card-deck-press-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
-  element('csv-restore').addEventListener('click', () => { setBusy(element('csv-restore'), true); hooks.send('csv-restore', null); });
+  element('csv-restore').addEventListener('click', () => {
+    if (restoreToken === null) return;
+    restoreConfirmation = { binding: { ...hooks.context() }, token: restoreToken };
+    element('csv-restore-copy').textContent = restoreTarget?.mode === 'google-sheet' ? `This restores the previous cards and reconnects this deck to ${restoreTarget.openUrl}. Generated output must be regenerated.` : 'This restores the previous cards in local editing mode. Generated output must be regenerated.';
+    element<HTMLDialogElement>('csv-restore-dialog').showModal();
+  });
+  element('csv-restore-cancel').addEventListener('click', closeRestore);
+  element('csv-restore-confirm').addEventListener('click', () => {
+    const captured = restoreConfirmation;
+    const confirmed = element<HTMLDialogElement>('csv-restore-dialog').open;
+    closeRestore();
+    if (!confirmed || !captured || !sameBinding(captured.binding, hooks.context())) return;
+    setBusy(element('csv-restore'), true); hooks.send('csv-restore', captured.token, captured.binding);
+  });
   element('csv-sample').addEventListener('click', () => download('card_id,quantity,name\r\n001,1,Joker\r\n002,2,Queen\r\n', 'card-deck-press-sample.csv'));
   element('csv-add-artwork').addEventListener('click', () => { artworkInput.value = ''; artworkInput.click(); });
   artworkInput.addEventListener('change', async () => {
     const files = [...artworkInput.files ?? []]; if (!files.length) return;
+    const captured = { ...hooks.context() }; const fileRevision = revision;
     try {
       if (files.length > 100 || files.reduce((size, file) => size + file.size, 0) > 32 * 1024 * 1024) throw new Error('Choose up to 100 images, totaling at most 32 MiB.');
       uploading = true; apply.disabled = true; error('');
       element('csv-summary').textContent = 'Uploading artwork…';
       setBusy(element('csv-summary'), true);
-      hooks.send('upload-artwork', await Promise.all(files.map(async file => ({ name: file.name, mimeType: file.type, data: new Uint8Array(await file.arrayBuffer()) }))));
-    } catch (issue) { uploading = false; error(issue instanceof Error ? issue.message : 'Artwork upload failed.'); }
+      const images = await Promise.all(files.map(async file => ({ name: file.name, mimeType: file.type, data: new Uint8Array(await file.arrayBuffer()) })));
+      if (fileRevision !== revision || !sameBinding(captured, hooks.context())) return;
+      hooks.send('upload-artwork', images, captured);
+    } catch (issue) { if (fileRevision === revision && sameBinding(captured, hooks.context())) { uploading = false; error(issue instanceof Error ? issue.message : 'Artwork upload failed.'); } }
   });
   hooks.send('csv-status', null);
-  return (type, value) => {
+  const message = (type: string, value: unknown, changes?: { outputChanged: boolean }) => {
     if (type === 'CSV_ERROR') {
       const data = value as { revision?: number };
       if (data.revision !== undefined && data.revision !== revision) return;
@@ -114,9 +150,9 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
       for (const id of ['csv-export', 'csv-export-safe', 'csv-restore']) setBusy(element(id), false);
     }
     if (['CSV_RESET', 'CSV_APPLIED', 'CSV_ERROR'].includes(type)) setBusy(element('csv-summary'), false);
-    if (type === 'CSV_RESET') { source = ''; revision++; preview = null; mapping = undefined; uploading = false; apply.disabled = true; close(); error(''); element('csv-filename').textContent = ''; element('csv-summary').textContent = ''; element('csv-mapping').replaceChildren(); element('csv-preview-table').replaceChildren(); }
+    if (type === 'CSV_RESET') { closeRestore(); restoreToken = null; restoreTarget = null; source = ''; revision++; preview = null; mapping = undefined; uploading = false; apply.disabled = true; close(); error(''); element('csv-filename').textContent = ''; element('csv-summary').textContent = ''; element('csv-mapping').replaceChildren(); element('csv-preview-table').replaceChildren(); }
     else if (type === 'CSV_PREVIEW') display(value as ImportPreview);
-    else if (type === 'CSV_APPLIED') { hooks.apply(value as CardRecord[]); hooks.invalidate(); close(); }
+    else if (type === 'CSV_APPLIED') { hooks.apply(value as CardRecord[]); if (changes?.outputChanged !== false) hooks.invalidate(); close(); }
     else if (type === 'CSV_ERROR') {
       const data = value as { revision?: number; message: string };
       if (data.revision !== undefined && data.revision !== revision) return;
@@ -125,8 +161,10 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
       element('csv-deck-status').classList.remove('hidden');
     } else if (type === 'CSV_EXPORT') download(value as string, exportFilename);
     else if (type === 'CSV_STATUS') {
-      const data = value as { canRestore: boolean; stale: boolean };
-      element<HTMLButtonElement>('csv-restore').disabled = !data.canRestore;
+      const data = value as { canRestore: boolean; stale: boolean; restoreTarget?: { mode: string; openUrl?: string } | null; restoreToken?: number | null };
+      restoreTarget = data.restoreTarget ?? null;
+      restoreToken = data.restoreToken ?? null;
+      element<HTMLButtonElement>('csv-restore').disabled = !data.canRestore || restoreToken === null;
       element('csv-deck-status').textContent = 'Output is out of date. Forge again to update it.';
       element('csv-deck-status').classList.toggle('hidden', !data.stale);
     } else if (type === 'ARTWORK_PROGRESS') {
@@ -134,4 +172,10 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
       element('csv-summary').textContent = `Uploading artwork ${data.uploaded} of ${data.total}…`;
     } else if (type === 'ARTWORK_READY') { uploading = false; setBusy(element('csv-summary'), false); requestPreview(); }
   };
+  return { message, contextChanged() { if (restoreConfirmation && !sameBinding(restoreConfirmation.binding, hooks.context())) closeRestore(); if (binding && !sameBinding(binding, hooks.context())) { close(); error(''); } }, openSheet(read: GoogleSheetRead, captured: PageBinding) {
+    sheet = read; binding = captured; source = read.source; mapping = undefined;
+    element('csv-heading').textContent = 'Review Google Sheet'; element('csv-choose').classList.add('hidden'); element('csv-sample').classList.add('hidden');
+    element('csv-filename').textContent = `Worksheet ${read.link.worksheetId} · fetched ${new Date(read.fetchedAt).toLocaleString()}. Apply Changes connects this deck and makes rows read-only.`;
+    element('csv-panel').classList.remove('hidden'); element('cards-container').classList.add('hidden'); requestPreview();
+  } };
 }
