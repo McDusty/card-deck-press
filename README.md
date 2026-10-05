@@ -182,7 +182,7 @@ npm ci
 npm run dev
 ```
 
-The development command builds in watch mode and starts the preview. `npm run build` builds without starting a server. Reuse the Tilt-managed service if it is already running; both setups use port 4400.
+The development command builds in watch mode and starts the preview. Automatic UI reload is disabled because it can interrupt operations and disconnect Penpot's controller. Close and reopen the plugin after a rebuild to load both updated parts. `npm run build` builds without starting a server. Reuse the Tilt-managed service if it is already running; both setups use port 4400.
 
 For localhost loading issues, see [Penpot's local plugin instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot).
 

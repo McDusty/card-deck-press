@@ -1,5 +1,6 @@
 
 import "./style.css";
+import { setBusy } from './busy-ui';
 
 // Penpot includes the initial theme in the plugin URL (including hash routes).
 const initialTheme = new URLSearchParams(location.search || location.hash.split('?')[1] || '').get('theme');
@@ -59,11 +60,15 @@ function initMessageListener() {
   window.addEventListener("message", (event) => {
     if (event.source !== parent || !event.data || typeof event.data.type !== 'string') return;
     const message = event.data;
+    if (['DECK_SIZE_ERROR', 'ERROR_DECK_CREATE_PAGE_NOT_EMPTY', 'DECK_ERROR'].includes(message.type)) setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
+    if (message.type === 'ARTWORK_LIST') setBusy(document.getElementById('refresh-artwork'), false);
+    if (['POKER_SIZE_CORRECTED', 'TEMPLATE_SIZE_ERROR', 'DECK_ERROR'].includes(message.type)) setBusy(document.getElementById('correct-poker-size'), false);
     if (message.type === 'THEME_CHANGED') {
       if (message.data === 'light' || message.data === 'dark') document.documentElement.dataset.theme = message.data;
       return;
     }
     if (message.type === 'PAGE_CONTEXT') {
+      setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
       pageBinding = { pageId: message.pageId, session: message.session };
       cardsData = []; rowIds = []; cardFields = []; artworkAssets = []; artworkCells.clear(); imageTargets.clear();
       pdfOperation = null; setPdfBusy(false); invalidateOutput();
@@ -128,9 +133,11 @@ function initMessageListener() {
     } else if (event.data.type === 'FORGE_ERROR') {
       showForgeError(event.data.data);
     } else if (event.data.type === 'OUTPUT_READY') {
+      setBusy(document.getElementById('pdf-status'), false);
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
       setPdfStatus('Cards generated. Choose single cards, six-up, nine-up, or Print and Play to download a multi-page PDF.');
     } else if (event.data.type === 'FRONT_OUTPUT_READY') {
+      setBusy(document.getElementById('pdf-status'), false);
       pdfReady = true;
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
       document.getElementById('download-pdf')?.classList.remove('hidden');
@@ -228,8 +235,10 @@ function createDeck(this: HTMLElement, ev: Event) {
   let orientation = (document.getElementById("create-deck-orientation") as HTMLInputElement)?.value;
 
   try {
+    setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), true);
     sendMessage({ type: 'create-deck', name, size, orientation, data: customDeckSize() });
   } catch (error) {
+    setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
     showCreateSizeError(error instanceof Error ? error.message : 'Enter a valid card size.');
   }
 
@@ -499,6 +508,7 @@ function updateCardsEmptyState() {
 }
 
 function invalidateOutput() {
+  setBusy(document.getElementById('pdf-status'), false);
   editRevision++;
   pdfReady = false;
   document.getElementById('download-pdf')?.classList.add('hidden');
@@ -526,6 +536,8 @@ function forgeCards() {
     });
     showForgeError('');
     (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = true;
+    setPdfStatus('Generating cards…');
+    setBusy(document.getElementById('pdf-status'), true);
     sendMessage({ type: 'forge-cards', data: request });
   } catch (error) {
     showForgeError(error instanceof Error ? error.message : 'Check your output settings.');
@@ -539,6 +551,7 @@ function setPdfStatus(message: string) {
 }
 
 function setPdfBusy(busy: boolean) {
+  setBusy(document.getElementById('pdf-status'), busy);
   pdfBusy = busy;
   for (const id of ['box-forge-ok', 'box-forge-cancel', 'download-pdf', 'forge-type', 'forge-paper', 'forge-cut-marks']) {
     (document.getElementById(id) as HTMLButtonElement | HTMLSelectElement).disabled = busy;
@@ -588,6 +601,7 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
 }
 
 function showForgeError(message: string) {
+  if (message) { setBusy(document.getElementById('pdf-status'), false); setPdfStatus(''); }
   const error = document.getElementById('forge-error') as HTMLElement;
   error.textContent = message;
   error.classList.toggle('hidden', !message);
@@ -655,9 +669,10 @@ function updateTemplateSize() {
 
 function initCards() {
   loadCardFields(false);
-  document.getElementById('refresh-artwork')?.addEventListener('click', () => sendMessage({ type: 'load-artwork', data: null }));
+  document.getElementById('refresh-artwork')?.addEventListener('click', () => { setBusy(document.getElementById('refresh-artwork'), true); sendMessage({ type: 'load-artwork', data: null }); });
   document.getElementById('correct-poker-size')?.addEventListener('click', () => {
     (document.getElementById('correct-poker-size') as HTMLButtonElement).disabled = true;
+    setBusy(document.getElementById('correct-poker-size'), true);
     document.getElementById('template-size-note')?.classList.add('hidden');
     sendMessage({ type: 'correct-poker-size', data: null });
   });

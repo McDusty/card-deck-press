@@ -1,3 +1,4 @@
+import { setBusy } from './busy-ui';
 import { artworkName } from './artwork';
 import type { ArtworkAsset } from './artwork';
 import { openArtworkPicker, refreshArtworkPicker } from './artwork-picker';
@@ -42,11 +43,12 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
   let currentReference = hooks.reference;
 
   function invalid(message: string) {
+    setBusy(status, false);
     input.setCustomValidity(message); input.setAttribute('aria-invalid', 'true');
     status.textContent = message;
   }
   function choose(value: string) {
-    dirty = true; input.value = value; invalid('Checking Artwork…'); hooks.choose(value);
+    dirty = true; input.value = value; invalid('Checking Artwork…'); setBusy(status, true); hooks.choose(value);
   }
   input.addEventListener('input', () => {
     dirty = true; invalid('Press Enter or leave this field to match the image name.'); hooks.draft();
@@ -69,6 +71,7 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
     if (reference) preview.src = hooks.assetsUrl + (asset?.reference ?? reference).split('|')[1];
     else preview.removeAttribute('src');
     if (!dirty) {
+      setBusy(status, false);
       input.value = artworkName(assets, reference); input.setCustomValidity(''); input.removeAttribute('aria-invalid');
       status.textContent = reference && !asset ? 'Current image is outside Artwork.' : '';
     }
@@ -79,5 +82,5 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
   refresh(hooks.assets, hooks.reference);
   const message = (text: string) => { dirty = true; invalid(text); };
   return { element, refresh, accept: (assets, reference) => { dirty = false; refresh(assets, reference); },
-    pending: message, error: message, ready: () => input.validity.valid, focus: () => { input.focus(); input.reportValidity(); } };
+    pending: text => { message(text); setBusy(status, true); }, error: message, ready: () => input.validity.valid, focus: () => { input.focus(); input.reportValidity(); } };
 }

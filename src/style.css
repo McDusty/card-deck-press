@@ -148,3 +148,23 @@ select { cursor: pointer; }
   .csv-mapping-row { gap: 8px; }
   .csv-mapping-row span { width: 120px; }
 }
+
+/* Busy feedback stays beside the action or status; no blocking overlay. */
+.is-busy::before {
+  content: '';
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -2px;
+  animation: busy-spin .8s linear infinite;
+}
+:not(button).is-busy { color: var(--accent-primary); }
+button.is-busy { pointer-events: none; }
+@keyframes busy-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .is-busy::before { animation: none; }
+}
