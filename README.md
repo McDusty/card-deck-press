@@ -92,7 +92,7 @@ For **Google Sheets**, download the sheet as CSV and import that file. Live Goog
 2. Give it **one image fill** using a sample image. Set its size and crop in Penpot.
 3. Name it after the CSV column containing image filenames, with `#` at the start. An `art` column uses `#art`; an `illustration` column uses `#illustration`. Each variable layer needs a unique name.
 4. Put source images in **Artwork**. In the import view, **Add artwork images** uploads a batch and names each image rectangle after its filename. You can also place and name image rectangles yourself.
-5. Enter the exact image name, including its extension, in the CSV cell: for example, `healing.png`. Apply the import, then generate cards in Export.
+5. Enter the image name in the CSV cell: for example, `healing.png`. Raster file extensions can be omitted from the CSV or Artwork layer name. Exact matches take priority; multiple fallback matches require a unique name or folder path. Apply the import, then generate cards in Export.
 
 Use a path such as `Artwork/creatures/dragon.png` to distinguish duplicate names. Missing or ambiguous matches block the import. A blank mapped image cell clears that field; an unmapped field keeps its template content.
 

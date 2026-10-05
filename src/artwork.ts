@@ -9,7 +9,12 @@ export function searchArtwork(assets: readonly ArtworkAsset[], query: string): A
 }
 
 export function matchArtwork(assets: readonly ArtworkAsset[], value: string): ArtworkAsset[] {
-  return assets.filter(asset => asset.name === value || asset.path === value || asset.path.replace(/^Artwork\//, '') === value);
+  const names = (asset: ArtworkAsset) => [asset.name, asset.path, asset.path.replace(/^Artwork\//, '')];
+  const exact = assets.filter(asset => names(asset).includes(value));
+  if (exact.length) return exact;
+  // Penpot may name placed images without their original file extension.
+  const stem = (name: string) => name.replace(/\.(png|jpe?g|webp|gif|avif|bmp|tiff?)$/i, '');
+  return assets.filter(asset => names(asset).some(name => stem(name) === stem(value)));
 }
 
 export function resolveArtwork(assets: readonly ArtworkAsset[], value: string): string {

@@ -3,9 +3,27 @@ export interface CsvTable { headers: string[]; rows: CsvRow[] }
 export const CSV_MAX_BYTES = 2 * 1024 * 1024;
 export const CSV_MAX_RECORDS = 500;
 
+// The Penpot controller does not expose the browser's TextEncoder API.
+// Count UTF-8 bytes directly, including surrogate pairs and replacement bytes
+// for unpaired surrogates, without allocating an encoded copy of the file.
+function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (let index = 0; index < text.length; index++) {
+    const code = text.charCodeAt(index);
+    if (code <= 0x7f) bytes++;
+    else if (code <= 0x7ff) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff &&
+      text.charCodeAt(index + 1) >= 0xdc00 && text.charCodeAt(index + 1) <= 0xdfff) {
+      bytes += 4; index++;
+    } else bytes += 3;
+    if (bytes > CSV_MAX_BYTES) return bytes;
+  }
+  return bytes;
+}
+
 // Keep cells as strings. In particular, IDs like 001 must never become numbers.
 export function parseCsv(source: string): CsvTable {
-  if (new TextEncoder().encode(source).length > CSV_MAX_BYTES) throw new Error('CSV files must be smaller than 2 MiB.');
+  if (utf8ByteLength(source) > CSV_MAX_BYTES) throw new Error('CSV files must be smaller than 2 MiB.');
   const text = source.replace(/^\uFEFF/, '');
   const records: CsvRow[] = [];
   let values: string[] = [], cell = '', quoted = false, closed = false;
