@@ -322,5 +322,4 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
     build.publish(output);
     } catch (error) { build.rollback(); throw error; }
     finally { api.history.undoBlockFinish(undo); }
-    api.closePlugin();
 }

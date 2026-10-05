@@ -127,6 +127,9 @@ function initMessageListener() {
       note.classList.remove('hidden');
     } else if (event.data.type === 'FORGE_ERROR') {
       showForgeError(event.data.data);
+    } else if (event.data.type === 'OUTPUT_READY') {
+      (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
+      setPdfStatus('Cards generated. Choose a six-up or nine-up sheet layout to download a multi-page PDF.');
     } else if (event.data.type === 'FRONT_OUTPUT_READY') {
       pdfReady = true;
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;

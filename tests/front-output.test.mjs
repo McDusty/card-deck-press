@@ -8,6 +8,15 @@ import { fixture } from './fixture.mjs';
 const deck = count => Array.from({ length: count }, (_, i) => ({ '#name': `Card ${i + 1}` }));
 function walk(shape) { return [shape, ...(shape.children ?? []).flatMap(walk)]; }
 
+for (const mode of ['fronts-single', 'backs-single', 'standard', 'printplay', 'tabletop']) {
+  test(`${mode}: generation keeps the plugin open and reports completion`, () => {
+    const f = fixture({back:true});
+    f.forge(mode, deck(3));
+    assert.equal(f.wasClosed(), false);
+    assert.equal(f.messages.at(-1).type, 'OUTPUT_READY');
+  });
+}
+
 for (const [mode, perPage, counts] of [['fronts-6', 6, [6, 6, 6, 6, 6, 6, 6, 6, 4]], ['fronts-9', 9, [9, 9, 9, 9, 9, 7]]]) {
   test(`${mode}: 52 ordered fronts, incomplete final sheet, no Back template`, () => {
     const f = fixture();
@@ -132,8 +141,8 @@ for (const mode of ['standard', 'printplay', 'tabletop']) {
   test(`existing ${mode} layout still generates with a Back template`, () => {
     const f = fixture({ back: true });
     f.forge(mode, deck(2));
-    assert.equal(f.messages.length, 0);
-    assert.equal(f.wasClosed(), true);
+    assert.equal(f.messages.at(-1).type, 'OUTPUT_READY');
+    assert.equal(f.wasClosed(), false);
     assert.equal(f.page.findShapes({ name: 'Output', type: 'board' }).length, 1);
   });
 }
@@ -185,7 +194,7 @@ for (const [mode, counts] of [['backs-6', [6, 6, 1]], ['backs-9', [9, 4]], ['bac
     const actual = mode === 'backs-single' ? [output.children.length] : output.children.map(sheet => sheet.children.length);
     assert.deepEqual(actual, counts);
     assert.ok(walk(output).filter(shape => shape.type === 'text').every(shape => shape.characters === 'Shared back'));
-    assert.equal(f.wasClosed(), mode === 'backs-single');
+    assert.equal(f.wasClosed(), false);
   });
 }
 

@@ -349,10 +349,11 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             if (isFaceMode(request.type)) {
                 const output = generateFrontOutput(penpot, outputCards, request.type, request.paper, request.cutMarks, request.cardsData);
                 penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
-                if (!isSheetMode(request.type)) penpot.closePlugin();
-                else sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+                if (isSheetMode(request.type)) sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+                else sendUi({ type: 'OUTPUT_READY', data: null });
             } else {
                 forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks);
+                sendUi({ type: 'OUTPUT_READY', data: null });
             }
             penpot.currentPage?.setPluginData('csv-output-stale', 'false');
             if (penpot.currentPage?.getPluginData('csv-import-metadata')) sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
