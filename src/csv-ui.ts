@@ -18,6 +18,7 @@ export function initCsvUi(hooks: Hooks) {
   let source = '', revision = 0, preview: ImportPreview | null = null;
   let mapping: ColumnMapping | undefined;
   let uploading = false;
+  let activity: 'idle' | 'reading' | 'previewing' | 'applying' | 'uploading' = 'idle';
   let exportFilename = 'card-deck-press-deck.csv';
   let sheet: GoogleSheetRead | undefined;
   let binding: PageBinding | undefined;
@@ -27,20 +28,47 @@ export function initCsvUi(hooks: Hooks) {
   const input = element<HTMLInputElement>('csv-file');
   const artworkInput = element<HTMLInputElement>('artwork-files');
   const apply = element<HTMLButtonElement>('csv-apply');
-  function error(message: string) {
-    if (message) setBusy(element('csv-summary'), false);
+  const recheck = element<HTMLButtonElement>('csv-refresh');
+  function resetDetails() {
+    element<HTMLDetailsElement>('csv-details').open = false;
+    element('csv-source-note').textContent = '';
+    element('csv-source-note').classList.add('hidden');
+    element('csv-readout').textContent = '';
+  }
+  function showRecheck(show: boolean) {
+    recheck.classList.toggle('hidden', !show);
+    recheck.disabled = !show;
+  }
+  showRecheck(false);
+  function error(message: string, canRecheck = false) {
+    const needsRecovery = /recovery|recover previous state|recover interrupted import/i.test(message);
+    const retryApply = activity === 'applying';
+    if (message) {
+      setBusy(element('csv-summary'), false);
+      if (activity !== 'idle') element('csv-summary').textContent = activity === 'applying' ? 'Import could not finish.' : 'Import paused.';
+      if (activity === 'applying') {
+        preview = null;
+        message += needsRecovery
+          ? '\nChoose Cancel, then Recover interrupted import in Edit Deck before trying again.'
+          : '\nChoose Check again to review the import again before applying.';
+      }
+      activity = 'idle';
+    }
     element('csv-error').textContent = message;
     element('csv-error').classList.toggle('hidden', !message);
+    showRecheck(Boolean(message && source && binding && sameBinding(binding, hooks.context()) && !needsRecovery && (canRecheck || retryApply)));
   }
   function requestPreview() {
     if (!source || uploading) return;
     apply.disabled = true; preview = null; revision++;
-    error(''); element('csv-summary').textContent = 'Checking CSV and artwork…';
+    error(''); activity = 'previewing'; element('csv-summary').textContent = 'Checking spreadsheet rows and artwork…';
     setBusy(element('csv-summary'), true);
     hooks.send('csv-preview', { source, mapping, revision, sheet: sheet ? { version: 1, mode: 'google-sheet', revision: 0, spreadsheetId: sheet.link.spreadsheetId, worksheetId: sheet.link.worksheetId, openUrl: sheet.link.openUrl, lastApplied: sheet.fetchedAt } : undefined }, binding);
   }
   function close() {
-    revision++; preview = null; uploading = false; source = ''; sheet = undefined; binding = undefined; apply.disabled = true;
+    revision++; preview = null; uploading = false; activity = 'idle'; source = ''; sheet = undefined; binding = undefined; apply.disabled = true;
+    resetDetails();
+    showRecheck(false);
     element('csv-panel').classList.add('hidden'); element('cards-container').classList.remove('hidden');
   }
   function closeRestore() {
@@ -56,8 +84,11 @@ export function initCsvUi(hooks: Hooks) {
   function display(data: ImportPreview) {
     if (data.revision !== revision) return;
     preview = data; mapping = data.mapping;
+    activity = 'idle';
     setBusy(element('csv-summary'), false);
-    element('csv-summary').textContent = `${data.records} card records · ${data.copies} printed copies · ${data.artworkMatches} artwork matches.\n${data.added} added · ${data.changed} changed · ${data.removed} removed. ${!data.added && !data.changed && !data.removed && !data.orderChanged ? 'No card changes.' : 'Apply replaces the current card list.'}`;
+    const unchanged = !data.added && !data.changed && !data.removed && !data.orderChanged;
+    element('csv-summary').textContent = `${data.records} cards · ${data.copies} printed copies\n${unchanged ? 'No card changes.' : `${data.added} added · ${data.changed} changed · ${data.removed} removed.${data.orderChanged ? ' Card order changes.' : ''}\nApplying replaces this deck’s card list.`}`;
+    element('csv-readout').textContent = `${data.artworkMatches} artwork matches${data.artworkIssues ? ` · ${data.artworkIssues} unresolved` : ''}.`;
     const changes = element('csv-changes'); changes.replaceChildren();
     for (const [label, ids] of [['Added', data.addedIds], ['Changed', data.changedIds], ['Removed', data.removedIds]] as const) {
       const details = document.createElement('details'); const summary = document.createElement('summary'); summary.textContent = `${label}: ${ids?.length ?? 0}`;
@@ -86,17 +117,18 @@ export function initCsvUi(hooks: Hooks) {
       table.appendChild(tr);
     }
     element('csv-preview-table').replaceChildren(table);
-    error(data.errors.join('\n')); apply.disabled = data.errors.length > 0;
+    error(data.errors.join('\n'), data.artworkIssues > 0); apply.disabled = data.errors.length > 0;
   }
   for (const id of ['upload-csv', 'empty-import-csv', 'csv-choose']) {
     element(id).addEventListener('click', () => { input.value = ''; input.click(); });
   }
   input.addEventListener('change', async () => {
     const file = input.files?.[0]; if (!file) return;
+    resetDetails();
     element('csv-panel').classList.remove('hidden'); element('cards-container').classList.add('hidden');
     element('csv-filename').textContent = file.name; element('csv-preview-table').replaceChildren(); element('csv-mapping').replaceChildren();
     sheet = undefined; binding = { ...hooks.context() }; const captured = binding; element('csv-heading').textContent = 'Import CSV'; element('csv-choose').classList.remove('hidden'); element('csv-sample').classList.remove('hidden'); source = ''; preview = null; mapping = undefined; revision++; const fileRevision = revision; apply.disabled = true;
-    error(''); element('csv-summary').textContent = 'Reading CSV…'; setBusy(element('csv-summary'), true);
+    error(''); activity = 'reading'; element('csv-summary').textContent = 'Reading CSV…'; setBusy(element('csv-summary'), true);
     try {
       if (file.size > CSV_MAX_BYTES) throw new Error('Choose a CSV smaller than 2 MiB.');
       const bytes = await file.arrayBuffer();
@@ -106,9 +138,9 @@ export function initCsvUi(hooks: Hooks) {
       requestPreview();
     } catch (issue) { if (revision === fileRevision && sameBinding(captured, hooks.context())) error(issue instanceof Error ? issue.message : 'Save the spreadsheet as UTF-8 CSV and try again.'); }
   });
-  apply.addEventListener('click', () => { if (preview && !preview.errors.length && binding && sameBinding(binding, hooks.context())) { apply.disabled = true; element('csv-summary').textContent = 'Applying import…'; setBusy(element('csv-summary'), true); hooks.send('csv-apply', preview.token, binding); } });
+  apply.addEventListener('click', () => { if (!apply.disabled && preview && !preview.errors.length && binding && sameBinding(binding, hooks.context())) { apply.disabled = true; error(''); activity = 'applying'; element('csv-summary').textContent = 'Applying import…'; setBusy(element('csv-summary'), true); hooks.send('csv-apply', preview.token, binding); } });
   element('csv-cancel').addEventListener('click', () => { hooks.send('import-cancel', null); close(); });
-  element('csv-refresh').addEventListener('click', requestPreview);
+  recheck.addEventListener('click', () => { if (!recheck.disabled) requestPreview(); });
   element('csv-export').addEventListener('click', () => { setBusy(element('csv-export'), true); exportFilename = 'card-deck-press-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
   element('csv-export-safe').addEventListener('click', () => { setBusy(element('csv-export-safe'), true); exportFilename = 'card-deck-press-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
   element('csv-restore').addEventListener('click', () => {
@@ -133,12 +165,13 @@ export function initCsvUi(hooks: Hooks) {
     try {
       if (files.length > 100 || files.reduce((size, file) => size + file.size, 0) > 32 * 1024 * 1024) throw new Error('Choose up to 100 images, totaling at most 32 MiB.');
       uploading = true; apply.disabled = true; error('');
+      activity = 'uploading';
       element('csv-summary').textContent = 'Uploading artwork…';
       setBusy(element('csv-summary'), true);
       const images = await Promise.all(files.map(async file => ({ name: file.name, mimeType: file.type, data: new Uint8Array(await file.arrayBuffer()) })));
       if (fileRevision !== revision || !sameBinding(captured, hooks.context())) return;
       hooks.send('upload-artwork', images, captured);
-    } catch (issue) { if (fileRevision === revision && sameBinding(captured, hooks.context())) { uploading = false; error(issue instanceof Error ? issue.message : 'Artwork upload failed.'); } }
+    } catch (issue) { if (fileRevision === revision && sameBinding(captured, hooks.context())) { uploading = false; error(issue instanceof Error ? issue.message : 'Artwork upload failed.', true); } }
   });
   hooks.send('csv-status', null);
   const message = (type: string, value: unknown, changes?: { outputChanged: boolean }) => {
@@ -156,7 +189,7 @@ export function initCsvUi(hooks: Hooks) {
     else if (type === 'CSV_ERROR') {
       const data = value as { revision?: number; message: string };
       if (data.revision !== undefined && data.revision !== revision) return;
-      uploading = false; apply.disabled = true; error(data.message);
+      uploading = false; apply.disabled = true; error(data.message, true);
       element('csv-deck-status').textContent = data.message;
       element('csv-deck-status').classList.remove('hidden');
     } else if (type === 'CSV_EXPORT') download(value as string, exportFilename);
@@ -173,9 +206,12 @@ export function initCsvUi(hooks: Hooks) {
     } else if (type === 'ARTWORK_READY') { uploading = false; setBusy(element('csv-summary'), false); requestPreview(); }
   };
   return { message, contextChanged() { if (restoreConfirmation && !sameBinding(restoreConfirmation.binding, hooks.context())) closeRestore(); if (binding && !sameBinding(binding, hooks.context())) { close(); error(''); } }, openSheet(read: GoogleSheetRead, captured: PageBinding) {
+    resetDetails();
     sheet = read; binding = captured; source = read.source; mapping = undefined;
     element('csv-heading').textContent = 'Review Google Sheet'; element('csv-choose').classList.add('hidden'); element('csv-sample').classList.add('hidden');
-    element('csv-filename').textContent = `Worksheet ${read.link.worksheetId} · fetched ${new Date(read.fetchedAt).toLocaleString()}. Apply Changes connects this deck and makes rows read-only.`;
+    element('csv-filename').textContent = `Worksheet ${read.link.worksheetId} · read ${new Date(read.fetchedAt).toLocaleString()}.`;
+    element('csv-source-note').textContent = 'Applying connects this deck to Google Sheets. Edit cards in the sheet afterward.';
+    element('csv-source-note').classList.remove('hidden');
     element('csv-panel').classList.remove('hidden'); element('cards-container').classList.add('hidden'); requestPreview();
   } };
 }

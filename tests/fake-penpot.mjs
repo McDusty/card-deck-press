@@ -1,4 +1,6 @@
-export function createFakePenpot({ back = false, width = 750, height = 1039 } = {}) {
+export function createFakePenpot(options = {}) {
+  const { back = false, width = 750, height = 1039, emptyPluginDataIsMissing = false } = options;
+  const missingPluginData = Object.hasOwn(options, 'missingPluginData') ? options.missingPluginData : '';
   let nextId = 0;
   const shapes = new Map();
   const messages = [];
@@ -95,7 +97,7 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
     id: 'page-1', root,
     getShapeById: id => shapes.get(id) ?? null,
     findShapes: (criteria = {}) => [...shapes.values()].filter(shape => shape !== root && Object.entries(criteria).every(([key, value]) => shape[key] === value)),
-    getPluginData: key => data.get(key) ?? '',
+    getPluginData: key => !data.has(key) || (emptyPluginDataIsMissing && data.get(key) === '') ? missingPluginData : data.get(key),
     setPluginData: (key, value) => data.set(key, value),
   };
   const api = {

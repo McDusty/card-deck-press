@@ -6,7 +6,7 @@ interface PickerOptions {
   label: string;
   assets: readonly ArtworkAsset[];
   reference: string;
-  assetsUrl: string;
+  preview(image: HTMLImageElement, reference: string): void;
   choose(value: string): void;
   upload(): void;
 }
@@ -19,17 +19,18 @@ function createPicker() {
   dialog.setAttribute('aria-labelledby', title.id);
   const description = document.createElement('p'); description.id = 'artwork-picker-description';
   dialog.setAttribute('aria-describedby', description.id);
-  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Close';
-  close.setAttribute('aria-label', 'Close image picker'); close.addEventListener('click', () => dialog.close());
-  const header = document.createElement('div'); header.className = 'artwork-picker-header'; header.append(title, close);
+  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Cancel';
+  close.setAttribute('aria-label', 'Cancel image selection'); close.addEventListener('click', () => dialog.close());
+  const header = document.createElement('div'); header.className = 'artwork-picker-header'; header.append(title);
   const search = document.createElement('input'); search.type = 'search'; search.placeholder = 'Search image names…';
   search.setAttribute('aria-label', 'Search Artwork images'); search.autofocus = true;
   const count = document.createElement('p'); count.className = 'artwork-picker-count'; count.setAttribute('role', 'status');
   const results = document.createElement('div'); results.className = 'artwork-picker-results';
-  const footer = document.createElement('div'); footer.className = 'artwork-picker-actions';
-  const upload = document.createElement('button'); upload.type = 'button'; upload.textContent = 'Upload image';
-  const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = 'Clear image';
-  footer.append(upload, clear);
+  const footer = document.createElement('div'); footer.className = 'artwork-picker-actions action-bar';
+  const upload = document.createElement('button'); upload.type = 'button'; upload.textContent = 'Upload image'; upload.className = 'btn-primary';
+  const clear = document.createElement('button'); clear.type = 'button'; clear.textContent = 'Clear image'; clear.className = 'btn-danger';
+  const primary = document.createElement('div'); primary.className = 'action-primary action-pair'; primary.append(close, upload);
+  footer.append(clear, primary);
   dialog.append(header, description, search, count, results, footer); document.body.append(dialog);
   let current: PickerOptions | undefined;
 
@@ -46,7 +47,7 @@ function createPicker() {
       button.setAttribute('aria-label', `Choose ${asset.path}`);
       button.setAttribute('aria-pressed', String(asset.reference.split('|')[0] === options.reference.split('|')[0]));
       const image = document.createElement('img'); image.alt = ''; image.loading = 'lazy';
-      image.src = options.assetsUrl + asset.reference.split('|')[1];
+      options.preview(image, asset.reference);
       const text = document.createElement('span');
       const name = document.createElement('strong'); name.textContent = asset.name;
       const path = document.createElement('small'); path.textContent = asset.path;

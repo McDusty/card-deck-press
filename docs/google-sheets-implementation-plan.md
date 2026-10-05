@@ -56,7 +56,7 @@ Use the existing import preview: column mapping, five sample rows, artwork match
 
 State clearly that Apply replaces the whole card list, including cards removed from the sheet. Initial connection and Change Link also warn that the current local deck is being replaced and that editing will move to Google Sheets.
 
-The preview identifies the source worksheet and time read. **Apply Changes** saves exactly that preview; it does not fetch again. Changing column mappings rechecks the downloaded data. **Pull Latest** fetches again. **Refresh matches** rechecks local artwork without fetching again.
+The preview identifies the source worksheet and time read. **Apply Changes** saves exactly that preview; it does not fetch again. Uploading artwork and changing column mappings recheck the downloaded data automatically. **Pull Latest** fetches again. **Check again** appears only for artwork matching problems or an import error requiring another review, and rechecks the current preview without fetching again.
 
 A pull without changes reports “No card changes.” It still requires Apply to record a new successful read; do not mark output stale if ordered card data, relevant mapping, and field bindings are unchanged. Reordering cards can change print output even when added/changed/removed counts are zero: report **Order changed** separately.
 
@@ -95,7 +95,7 @@ Read displayed cell values, including formula results, as strings. No formula ev
 
 Imported data is inert content: render names and cell values with textContent, never HTML or executable script.
 
-Artwork uploads are separate persistent Penpot changes. Beside **Add artwork images**, state: “Added artwork stays in Penpot if you cancel this import.” Cancellation or Restore does not remove uploaded images. Refresh matches updates the current preview; a later upload error retains the successfully uploaded batch portion.
+Artwork uploads are separate persistent Penpot changes. Beside **Add artwork images**, state: “Added artwork stays in Penpot if you cancel this import.” Cancellation or Restore does not remove uploaded images. Uploads automatically update the preview. A later upload error retains the successfully uploaded batch portion and exposes **Check again** to review it.
 
 ## 4. Page storage and state
 

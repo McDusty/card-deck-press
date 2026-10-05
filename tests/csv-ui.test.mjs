@@ -92,3 +92,82 @@ test('preview exposes every changed ID and distinguishes changed order from a no
   assert.doesNotMatch(f.element('csv-summary').textContent, /No card changes/);
   f.preview(); assert.match(f.element('csv-summary').textContent, /No card changes/);
 });
+
+test('failed Apply stops loading, shows retry guidance and requires a fresh preview', () => {
+  const f = fixture(); f.ui.openSheet(read, { ...f.context }); f.preview(); f.element('csv-apply').click();
+  assert.equal(f.element('csv-summary').attributes.get('aria-busy'), 'true');
+  f.ui.message('CSV_ERROR', { message: 'Could not save the complete deck state.' });
+  assert.equal(f.element('csv-summary').attributes.get('aria-busy'), 'false');
+  assert.doesNotMatch(f.element('csv-summary').textContent, /Applying import/);
+  assert.equal(f.element('csv-error').classList.contains('hidden'), false);
+  assert.match(f.element('csv-error').textContent, /Could not save/);
+  assert.match(f.element('csv-error').textContent, /Check again/);
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), false);
+  assert.equal(f.element('csv-refresh').disabled, false);
+  assert.equal(f.element('csv-apply').disabled, true);
+  f.element('csv-apply').click(); assert.equal(f.sent.filter(m => m.type === 'csv-apply').length, 1);
+  f.element('csv-refresh').click();
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  assert.equal(f.element('csv-refresh').disabled, true);
+  f.preview({ token: 'token-2' }); f.element('csv-apply').click();
+  assert.equal(f.sent.findLast(m => m.type === 'csv-apply').data, 'token-2');
+  assert.equal(f.element('csv-error').textContent, '');
+});
+
+test('failed Apply requiring recovery explains recovery without claiming cards were unchanged', () => {
+  const f = fixture(); f.ui.openSheet(read, { ...f.context }); f.preview(); f.element('csv-apply').click();
+  f.ui.message('CSV_ERROR', { message: 'Import interrupted; recovery is required.' });
+  assert.match(f.element('csv-error').textContent, /Cancel, then Recover interrupted import in Edit Deck/);
+  assert.doesNotMatch(f.element('csv-error').textContent, /No cards were changed|Check again/);
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  assert.equal(f.element('csv-summary').attributes.get('aria-busy'), 'false');
+});
+
+test('Check again is hidden in valid reviews and for errors requiring spreadsheet or mapping edits', () => {
+  const f = fixture(); f.ui.openSheet(read, { ...f.context }); f.preview({ artworkIssues: 0 });
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  f.element('csv-refresh').click(); assert.equal(f.sent.filter(m => m.type === 'csv-preview').length, 1);
+  f.preview({ errors: ['Row 2, card_id: an ID is required.'], artworkIssues: 0 });
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  assert.equal(f.element('csv-apply').disabled, true);
+});
+
+test('artwork matching issues expose Check again, then a successful review hides it', () => {
+  const f = fixture(); f.ui.openSheet(read, { ...f.context });
+  f.preview({ errors: ['Row 2, art: missing image "healing.png".'], artworkIssues: 1 });
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), false);
+  f.element('csv-refresh').click();
+  const request = f.sent.findLast(m => m.type === 'csv-preview');
+  assert.equal(request.data.source, read.source); assert.equal(request.binding.pageId, 'page-1');
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  f.preview({ artworkIssues: 0 });
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  assert.equal(f.element('csv-apply').disabled, false);
+});
+
+test('artwork uploads and mapping edits still recheck automatically without a manual button', () => {
+  const f = fixture(); f.ui.openSheet(read, { ...f.context }); f.preview({ artworkIssues: 0 });
+  f.ui.message('ARTWORK_READY', { uploaded: 1 });
+  assert.equal(f.sent.filter(m => m.type === 'csv-preview').length, 2);
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  f.preview({ artworkIssues: 0 });
+  const select = f.element('csv-mapping').children[1].children[1]; select.value = ''; select.change();
+  assert.equal(f.sent.filter(m => m.type === 'csv-preview').length, 3);
+  assert.equal(f.sent.at(-1).data.mapping.title, '');
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+});
+
+test('retry state cannot leak across cancellation, pages or stale errors', () => {
+  const f = fixture(); f.ui.openSheet(read, { ...f.context });
+  f.preview({ errors: ['Missing artwork.'], artworkIssues: 1 });
+  const oldRevision = f.sent.at(-1).data.revision;
+  f.element('csv-cancel').click();
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  f.ui.openSheet(read, { ...f.context }); f.preview({ artworkIssues: 0 });
+  f.ui.message('CSV_ERROR', { revision: oldRevision, message: 'Old failed preview.' });
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  f.preview({ errors: ['Missing artwork.'], artworkIssues: 1 });
+  f.context.pageId = 'page-2'; f.context.session++; f.ui.message('CSV_RESET', null);
+  assert.equal(f.element('csv-refresh').classList.contains('hidden'), true);
+  f.element('csv-refresh').click(); assert.equal(f.sent.filter(m => m.type === 'csv-preview').length, 2);
+});

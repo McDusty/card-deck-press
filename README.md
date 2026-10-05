@@ -55,6 +55,8 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 - **Simpler presentation:** decorative character artwork and button outlines were removed. The creation panel starts with the form, followed by a short explanation of what to do next.
 - **Useful feedback:** template dimensions, import previews, validation errors, and out-of-date output notices explain what needs attention before generating or downloading.
 - **Keyboard access and guidance:** tabs support keyboard navigation, row actions stay visible, and Help is one scrollable document with a clickable table of contents.
+- **Consistent actions:** primary actions sit on the right, Cancel sits immediately beside its action, and red destructive actions sit on the left. Contributors should follow the [button guidelines](docs/button-guidelines.md).
+- **Deck utilities:** the table header's **More actions** menu holds Refresh Artwork, both CSV exports, Restore Previous State, and available template correction. Main actions keep visible labels and small icons.
 
 ## Getting started
 
@@ -78,6 +80,8 @@ shield,4,Shield,shield.png
 This example expects a text layer named `#name` and an image placeholder named `#art` in Front. Print sheets contain ten Healing cards followed by four Shield cards.
 
 - **Import CSV:** map columns to Card ID, Quantity, template fields, or Ignore. Matching headers map automatically. Review the preview and added, changed, and removed records before applying.
+- **Import details:** expand this section for the source worksheet and read time, artwork matching details, and lists of changed Card IDs. Card counts, change totals, and errors stay visible in the review.
+- **Automatic checks:** artwork uploads and column mapping changes recheck the preview automatically. **Check again** appears only for artwork matching problems or an import error that needs another review. It rechecks the downloaded rows; **Pull Latest** reads updated Google Sheet rows.
 - **Updates:** each import replaces the complete card list. Keep IDs stable between imports, then generate cards again to update output. Existing output remains until a replacement succeeds.
 - **Quantity:** use whole numbers from 0 to 100. Zero excludes the card. Print sheets repeat copies; single-front, Standard, and Tabletop layouts include each nonzero design once.
 - **Export CSV:** keeps your card text unchanged. Use this for backups, editing, and importing back into the plugin. Ignored source columns are not retained.
@@ -120,7 +124,7 @@ Batch uploads support **100 images totaling 32 MiB**. Replace the fill on an exi
 For locally edited decks in **Edit Deck**, each image field offers:
 
 - **Artwork image name:** type an exact filename or path, then press Enter or leave the field to match it.
-- **Pencil button:** open the image picker, search image names, and choose a thumbnail. Full paths distinguish duplicate filenames. Close the picker or press Escape to keep the current image.
+- **Pencil button:** open the image picker, search image names, and choose a thumbnail. Full paths distinguish duplicate filenames. Click Cancel or press Escape to keep the current image.
 - **Upload image** (inside the picker): add a new image to Artwork and assign it to this card. It keeps its filename and can be reused in other rows or CSV imports.
 - **Clear image** (inside the picker): remove the card's image without deleting the source from Artwork.
 

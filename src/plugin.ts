@@ -17,6 +17,7 @@ import { forgeLegacyCards } from './legacy-output';
 import { readSource, requireLocalSource, localSource, SOURCE_KEY } from './deck-source';
 import { deckFingerprint } from './deck-fingerprint';
 import { captureState, commitState, recoverState, requireRecovered, RECOVERY_KEY } from './deck-storage';
+import { artworkThumbnail } from './artwork-thumbnail';
 const deckSession = new DeckSession(penpot);
 const imageTargets = new ImageTargets();
 const csvImporter = new CsvImporter(penpot);
@@ -132,8 +133,7 @@ function loadCardFields() {
 
     const fields = card ? findFields(card, []).filter((field, index, all) => all.findIndex(item => item.name === field.name) === index) : [];
 
-    const assetsUrl = "https://design.penpot.app/assets/by-file-media-id/";
-    sendUi({ "type": "CARD_FIELDS", "data": { fields: fields, assetsUrl: assetsUrl } });
+    sendUi({ "type": "CARD_FIELDS", "data": { fields } });
     loadArtwork();
 }
 
@@ -329,6 +329,22 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
     if (message.type === 'load-page') {
         if (deckSession.context.pageId !== (penpot.currentPage?.id ?? null)) deckSession.changePage();
         loadPage(); return;
+    }
+    if (message.type === 'artwork-thumbnail') {
+        const context = deckSession.context;
+        const page = penpot.currentPage;
+        try {
+            deckSession.require(message);
+            if (!page || typeof message.requestId !== 'string') throw new Error('Open the deck page to load artwork previews.');
+            void artworkThumbnail(page, message.data).then(data => {
+                if (deckSession.matches(context)) sendUi({ type: 'ARTWORK_THUMBNAIL', data, requestId: message.requestId }, context);
+            }).catch(error => {
+                if (deckSession.matches(context)) sendUi({ type: 'ARTWORK_THUMBNAIL_ERROR', data: error instanceof Error ? error.message : 'Artwork preview unavailable.', requestId: message.requestId }, context);
+            });
+        } catch (error) {
+            sendUi({ type: 'ARTWORK_THUMBNAIL_ERROR', data: error instanceof Error ? error.message : 'Artwork preview unavailable.', requestId: message.requestId }, context);
+        }
+        return;
     }
     const mutating = ['create-deck', 'save-cards-data', 'create-image-data', 'select-artwork', 'upload-artwork', 'forge-cards', 'export-front-pdf', 'correct-poker-size', 'csv-preview', 'csv-apply', 'csv-restore', 'csv-export', 'sheet-begin', 'sheet-disconnect', 'source-recover', 'import-cancel', 'pdf-check'];
     if (mutating.includes(message.type)) {

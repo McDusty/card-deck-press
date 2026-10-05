@@ -13,7 +13,7 @@ export interface ImportMetadata { mapping: ColumnMapping; fields: ImportField[] 
 export interface ImportPreview {
   revision: number; token: number; headers: string[]; fields: ImportField[]; mapping: ColumnMapping;
   rows: { line: number; values: string[] }[]; records: number; copies: number;
-  added: number; changed: number; removed: number; addedIds: string[]; changedIds: string[]; removedIds: string[]; orderChanged: boolean; errors: string[]; artworkMatches: number;
+  added: number; changed: number; removed: number; addedIds: string[]; changedIds: string[]; removedIds: string[]; orderChanged: boolean; errors: string[]; artworkMatches: number; artworkIssues: number;
 }
 const META = 'csv-import-metadata';
 const BACKUP = BACKUP_KEY;
@@ -112,7 +112,7 @@ export class CsvImporter {
     const assets = listArtwork(page);
     const ids = new Set<string>();
     const cards: CardRecord[] = [];
-    let artworkMatches = 0;
+    let artworkMatches = 0, artworkIssues = 0;
     for (const row of table.rows) {
       const card: CardRecord = Object.create(null);
       for (const [index, header] of table.headers.entries()) {
@@ -122,7 +122,7 @@ export class CsvImporter {
         const field = fields.find(field => field.name === target);
         if (field?.type === 'image' && value) {
           const matches = matchArtwork(assets, value);
-          if (matches.length !== 1) errors.push(`Row ${row.line}, ${header}: ${matches.length ? 'multiple images named' : 'missing image'} "${value}". Use a unique name or Artwork/path.`);
+          if (matches.length !== 1) { artworkIssues++; errors.push(`Row ${row.line}, ${header}: ${matches.length ? 'multiple images named' : 'missing image'} "${value}". Use a unique name or Artwork/path.`); }
           else { card[target] = matches[0].reference; artworkMatches++; }
         } else card[target] = value;
       }
@@ -150,7 +150,7 @@ export class CsvImporter {
     const orderChanged = JSON.stringify(oldOrder) !== JSON.stringify(newOrder);
     const token = ++this.serial;
     if (!errors.length) this.pending = { pageId: page.id, token, source: input.source, mapping, snapshot: snapshot(page), cards, fields: mappedFields, artwork: JSON.stringify(assets), sheet };
-    return { revision: input.revision, token, headers: table.headers, fields, mapping, rows: table.rows.slice(0, 5), records: cards.length, copies, added, changed, removed, addedIds, changedIds, removedIds, orderChanged, errors: errors.slice(0, 50), artworkMatches };
+    return { revision: input.revision, token, headers: table.headers, fields, mapping, rows: table.rows.slice(0, 5), records: cards.length, copies, added, changed, removed, addedIds, changedIds, removedIds, orderChanged, errors: errors.slice(0, 50), artworkMatches, artworkIssues };
   }
   apply(token: unknown): CardRecord[] {
     const pending = this.pending;

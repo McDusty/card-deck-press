@@ -12,6 +12,15 @@ type WriteState = Record<typeof WRITE_KEYS[number], string>;
 interface Recovery { version: 1; phase: 'prepared' | 'committed'; before: WriteState; after: WriteState }
 const object = (v: unknown): v is Record<string, unknown> => Boolean(v && typeof v === 'object' && !Array.isArray(v));
 
+function readStoredString(page: Page, key: string): string {
+  // Penpot returns null for absent data, despite the API's string return type.
+  // Normalize only live missing values; serialized backups still need every key.
+  const value: unknown = page.getPluginData(key);
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string') throw new Error(`Penpot's saved deck data is invalid (${key}). Export your cards before repairing stored data.`);
+  return value;
+}
+
 export function parseCards(raw: string): CardRecord[] {
   if (!raw) return [];
   let value: unknown = JSON.parse(raw);
@@ -34,10 +43,10 @@ export function validateMetadata(raw: string): void {
   }
 }
 export function captureState(page: Page): DeckState {
-  return Object.fromEntries(STATE_KEYS.map(key => [key, page.getPluginData(key)])) as DeckState;
+  return Object.fromEntries(STATE_KEYS.map(key => [key, readStoredString(page, key)])) as DeckState;
 }
 function rawState(value: unknown, keys: readonly string[]): Record<string, string> {
-  if (!object(value) || Object.keys(value).length !== keys.length || keys.some(key => typeof value[key] !== 'string')) throw new Error('Incomplete saved deck state. No cards were changed.');
+  if (!object(value) || Object.keys(value).length !== keys.length || keys.some(key => typeof value[key] !== 'string')) throw new Error('The saved deck backup is incomplete or invalid. Export your cards before repairing stored data.');
   return value as Record<string, string>;
 }
 export function validateState(value: unknown): DeckState {
@@ -61,15 +70,15 @@ export function decodeBackup(raw: string): DeckState {
   return validateState({ ...legacy, [SOURCE_KEY]: '', 'csv-output-stale': 'true' });
 }
 export function requireRecovered(page: Page): void {
-  if (page.getPluginData(RECOVERY_KEY)) throw new Error('An interrupted import needs recovery. Recover previous state before changing this deck.');
+  if (readStoredString(page, RECOVERY_KEY)) throw new Error('An interrupted import needs recovery. Recover previous state before changing this deck.');
 }
 function writeVerified(page: Page, key: string, value: string): void {
   // A setter may throw after persisting. Readback is the authority.
   try { page.setPluginData(key, value); }
-  catch (error) { if (page.getPluginData(key) !== value) throw error; }
-  if (page.getPluginData(key) !== value) throw new Error(`Could not verify saved ${key}.`);
+  catch (error) { if (readStoredString(page, key) !== value) throw error; }
+  if (readStoredString(page, key) !== value) throw new Error(`Could not verify saved ${key}.`);
 }
-function equals(page: Page, state: WriteState): boolean { return WRITE_KEYS.every(key => page.getPluginData(key) === state[key]); }
+function equals(page: Page, state: WriteState): boolean { return WRITE_KEYS.every(key => readStoredString(page, key) === state[key]); }
 function writeAll(page: Page, state: WriteState): void {
   let issue: unknown;
   for (const key of WRITE_KEYS) {
@@ -80,7 +89,7 @@ function writeAll(page: Page, state: WriteState): void {
 export function commitState(page: Page, next: DeckState, meaningful = true): void {
   requireRecovered(page); validateState(next);
   const old = captureState(page);
-  const before: WriteState = { ...old, [BACKUP_KEY]: page.getPluginData(BACKUP_KEY) };
+  const before: WriteState = { ...old, [BACKUP_KEY]: readStoredString(page, BACKUP_KEY) };
   const after: WriteState = { ...next, [BACKUP_KEY]: meaningful ? encodeBackup(old) : before[BACKUP_KEY] };
   const record: Recovery = { version: 1, phase: 'prepared', before, after };
   // Never touch a deck key until the durable recovery record is verified.
@@ -96,7 +105,7 @@ export function commitState(page: Page, next: DeckState, meaningful = true): voi
   }
 }
 export function recoverState(page: Page): void {
-  const raw = page.getPluginData(RECOVERY_KEY);
+  const raw = readStoredString(page, RECOVERY_KEY);
   if (!raw) return;
   const v: unknown = JSON.parse(raw);
   if (!object(v) || v.version !== 1 || !['prepared', 'committed'].includes(String(v.phase))) throw new Error('Recovery record is invalid. Export your cards before repairing stored data.');

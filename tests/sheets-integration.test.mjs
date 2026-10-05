@@ -27,6 +27,61 @@ function apply(f, source, draft, mapping) {
 }
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
+for (const missingPluginData of [null, undefined]) {
+  const options = { missingPluginData, emptyPluginDataIsMissing: true };
+  test(`first sheet import, disconnect and restore work with ${missingPluginData} missing Penpot data`, () => {
+    const f = fixture(options);
+    assert.equal(f.page.getPluginData('outputSettings'), missingPluginData);
+    assert.ok(apply(f), JSON.stringify(f.messages.at(-1)));
+    assert.equal(cards(f)[0]['#name'], 'Healing');
+    assert.equal(sources.readSource(f.page).mode, 'google-sheet');
+    assert.equal(f.page.getPluginData(storage.RECOVERY_KEY), missingPluginData);
+    const backup = storage.decodeBackup(f.page.getPluginData(storage.BACKUP_KEY));
+    assert.ok(Object.values(backup).every(value => value === ''));
+    f.message('sheet-disconnect', null);
+    assert.equal(sources.readSource(f.page).mode, 'local');
+    f.restore(); assert.equal(sources.readSource(f.page).mode, 'google-sheet');
+    assert.equal(cards(f)[0]['#name'], 'Healing');
+  });
+  test(`first CSV import and empty-deck restore work with ${missingPluginData} missing Penpot data`, () => {
+    const f = fixture(options);
+    f.message('csv-preview', { source: 'card_id,name\n001,Healing', revision: 1 });
+    const p = f.messages.findLast(m => m.type === 'CSV_PREVIEW');
+    assert.equal(p.data.errors.length, 0);
+    f.message('csv-apply', p.data.token);
+    assert.ok(f.messages.findLast(m => m.type === 'CSV_APPLIED'), JSON.stringify(f.messages.at(-1)));
+    assert.equal(cards(f)[0]['#name'], 'Healing');
+    f.restore(); assert.deepEqual(cards(f), []);
+    assert.equal(f.page.getPluginData('outputSettings'), missingPluginData);
+    assert.equal(f.page.getPluginData(storage.RECOVERY_KEY), missingPluginData);
+  });
+  test(`rollback and durable recovery preserve missing ${missingPluginData} fields`, () => {
+    const f = fixture(options), before = storage.captureState(f.page), write = f.page.setPluginData;
+    f.page.setPluginData = (key, value) => {
+      if (key === 'csv-output-stale' && value === 'true') throw new Error('Commit failure');
+      if (key === 'cardsData' && value === '') throw new Error('Rollback failure');
+      write(key, value);
+    };
+    assert.throws(() => storage.commitState(f.page, { ...before, cardsData: '[{"quantity":"1"}]', 'csv-output-stale': 'true' }), /recovery is required/);
+    const record = JSON.parse(f.page.getPluginData(storage.RECOVERY_KEY));
+    assert.ok(Object.values(record.before).every(value => typeof value === 'string'));
+    f.page.setPluginData = write; f.message('source-recover', null);
+    assert.deepEqual(storage.captureState(f.page), before);
+    assert.equal(f.page.getPluginData(storage.BACKUP_KEY), missingPluginData);
+    assert.equal(f.page.getPluginData(storage.RECOVERY_KEY), missingPluginData);
+  });
+}
+
+test('live non-string stored data and null backup fields are still rejected', () => {
+  const f = fixture({ missingPluginData: null });
+  f.page.setPluginData('outputSettings', 42);
+  assert.throws(() => storage.captureState(f.page), /saved deck data is invalid/);
+  f.page.setPluginData('outputSettings', '');
+  const before = storage.captureState(f.page);
+  assert.throws(() => storage.decodeBackup(JSON.stringify({ version: 1, state: { ...before, outputSettings: null } })), /backup is incomplete or invalid/);
+  assert.deepEqual(storage.captureState(f.page), before);
+});
+
 test('connection is a draft until Apply; linked mode persists per page', () => {
   const f = fixture(); const p = preview(f);
   assert.equal(f.page.getPluginData('deck-source'), '');

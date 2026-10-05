@@ -1,6 +1,8 @@
 
 import "./style.css";
 import { setBusy } from './busy-ui';
+import { initActionMenu } from './action-menu';
+let deckTools: ReturnType<typeof initActionMenu> | undefined;
 
 // Penpot includes the initial theme in the plugin URL (including hash routes).
 const initialTheme = new URLSearchParams(location.search || location.hash.split('?')[1] || '').get('theme');
@@ -22,6 +24,7 @@ import { createArtworkCell } from './artwork-cell';
 import type { ArtworkCell } from './artwork-cell';
 import type { ArtworkAsset } from './artwork';
 import { closeArtworkPicker } from './artwork-picker';
+import { ArtworkPreviews } from './artwork-previews';
 let artworkAssets: ArtworkAsset[] = [];
 const artworkCells = new Map<string, ArtworkCell>();
 const artworkKey = (rowId: string, name: string) => JSON.stringify([rowId, name]);
@@ -44,7 +47,6 @@ function listenerFunction(this: HTMLElement, ev: Event) {
 }
 */
 
-let assetsUrl = "";
 let sheetCutLines = true;
 let pdfReady = false;
 let pdfBusy = false;
@@ -58,6 +60,7 @@ let templateSizeInfo: TemplateSizeInfo = { templates: [], canCorrectPoker: false
 function sendMessage(message: PluginUIEvent, binding: PageBinding = pageBinding) {
   parent.postMessage({ ...message, ...binding }, '*');
 }
+const artworkPreviews = new ArtworkPreviews((reference, requestId) => sendMessage({ type: 'artwork-thumbnail', data: reference, requestId }));
 
 
 function initMessageListener() {
@@ -72,6 +75,8 @@ function initMessageListener() {
       return;
     }
     if (message.type === 'PAGE_CONTEXT') {
+      deckTools?.close();
+      artworkPreviews.reset();
       setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
       pageBinding = { pageId: message.pageId, session: message.session, epoch: message.epoch };
       cardsData = []; rowIds = []; cardFields = []; artworkAssets = []; artworkCells.clear(); imageTargets.clear();
@@ -84,10 +89,13 @@ function initMessageListener() {
     }
     if (message.pageId !== pageBinding.pageId || message.session !== pageBinding.session) return;
     if (message.type === 'SOURCE_CONTEXT') {
+      deckTools?.close();
+      artworkPreviews.reset();
       pageBinding = { pageId: message.pageId, session: message.session, epoch: message.epoch };
       imageTargets.clear(); closeArtworkPicker(); sheetsUi?.contextChanged(); csvUi?.contextChanged(); reloadCardEntries(); return;
     }
     if (message.epoch !== pageBinding.epoch) return;
+    artworkPreviews.message(message.type, message.data, message.requestId);
     if (message.type === 'CSV_APPLIED') { rowIds = message.rowIds; imageTargets.clear(); }
     csvUi?.message(message.type, message.data, message.changes); sheetsUi?.message(message.type, message.data);
     if (event.data.type == "ERROR_DECK_CREATE_PAGE_NOT_EMPTY") {
@@ -97,7 +105,6 @@ function initMessageListener() {
     } else if (event.data.type == "CARDS_DATA") {
       loadCardsData(event.data.data, event.data.rowIds);
     } else if (event.data.type == "CARD_FIELDS") {
-      assetsUrl = document.referrer ? new URL('/assets/by-file-media-id/', document.referrer).href : event.data.data.assetsUrl;
       cardFields = event.data.data.fields;
       loadCardFields();
     } else if (event.data.type == "IMAGE_CREATED") {
@@ -105,6 +112,7 @@ function initMessageListener() {
     } else if (message.type === 'ARTWORK_SELECTED') {
       updateImageReference(message.data, message.data.reference);
     } else if (message.type === 'ARTWORK_LIST') {
+      artworkPreviews.reset();
       artworkAssets = message.data as ArtworkAsset[];
       if (rowsReadOnly) reloadCardEntries();
       for (const [key, cell] of artworkCells) {
@@ -187,6 +195,7 @@ const tabSelectors = document.querySelectorAll<HTMLButtonElement>('.tab-selector
 const tabs = document.querySelectorAll('.tab');
 
 function changeTab(name: string) {
+  deckTools?.close();
   for (const element of tabSelectors) {
     const selected = element.dataset.tab === name;
     element.classList.toggle('current', selected);
@@ -347,7 +356,7 @@ function createCardEntry(num: number, cardData: CardRecord) {
 
   let copy = document.createElement("button");
   copy.type = 'button'; copy.setAttribute('aria-label', `Duplicate card ${num}`);
-  copy.classList.add("card-action-copy");
+  copy.classList.add("card-action-copy", "btn-primary");
   copy.addEventListener("click", () => { currentIndex() >= 0 && copyCard(currentIndex() + 1) });
   actions.appendChild(copy);
 
@@ -355,7 +364,9 @@ function createCardEntry(num: number, cardData: CardRecord) {
   del.type = 'button'; del.setAttribute('aria-label', `Delete card ${num}`);
   del.classList.add("card-action-delete");
   del.addEventListener("click", () => { currentIndex() >= 0 && deleteCard(currentIndex() + 1) });
-  actions.appendChild(del);
+  const deleteActions = document.createElement('div'); deleteActions.className = 'card-delete-actions';
+  if (!rowsReadOnly) deleteActions.appendChild(del);
+  entry.appendChild(deleteActions);
 
   let number = document.createElement("div");
   number.classList.add("card-num");
@@ -403,12 +414,12 @@ function createCardEntry(num: number, cardData: CardRecord) {
       if (rowsReadOnly) {
         const container = document.createElement('div'); container.className = 'card-image card-image-readonly';
         const reference = cardData[field.name] ?? ''; const asset = artworkAssets.find(item => item.reference.split('|')[0] === reference.split('|')[0]);
-        if (reference) { const image = document.createElement('img'); image.className = 'card-image-preview'; image.alt = ''; image.src = assetsUrl + (asset?.reference ?? reference).split('|')[1]; container.appendChild(image); }
+        if (reference) { const image = document.createElement('img'); image.className = 'card-image-preview'; image.alt = ''; container.appendChild(image); artworkPreviews.show(image, asset?.reference ?? reference); }
         const label = document.createElement('span'); label.textContent = asset?.name ?? (reference ? 'Artwork image' : 'No image'); container.appendChild(label); entry.appendChild(container); continue;
       }
       const cell = createArtworkCell({
         label: `${field.name.substring(1)} for card ${num}`,
-        reference: cardData[field.name] ?? '', assets: artworkAssets, assetsUrl,
+        reference: cardData[field.name] ?? '', assets: artworkAssets, preview: (image, reference) => artworkPreviews.show(image, reference),
         choose: value => { if (currentIndex() >= 0) chooseCardArtwork(rowId, entrySession, field.name, value); },
         upload: event => { if (currentIndex() >= 0) void saveCardImage(rowId, entrySession, field.name, event); },
         draft: () => { imageTargets.cancel(rowId, field.name); invalidateOutput(); },
@@ -431,7 +442,7 @@ function addEmptyCard() {
   cardList?.appendChild(entry);
   updateCardsEmptyState();
   saveCardsData();
-  cardList.scrollTop = cardList?.scrollHeight;
+  entry.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   entry.querySelector<HTMLTextAreaElement>('textarea')?.focus();
 }
 
@@ -750,6 +761,7 @@ function renderHelpCardSizes() {
 //////////////////////////// ONLOAD
 
 window.onload = (_event) => {
+  deckTools = initActionMenu(document.getElementById('deck-tools-toggle') as HTMLButtonElement, document.getElementById('deck-tools-menu')!);
   initMessageListener();
   initTabSelectors();
   initCreateDeck();

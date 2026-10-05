@@ -90,9 +90,9 @@ for(const [source,match] of [
 
 test('missing and ambiguous image names block import; full paths resolve duplicates',()=>{
  const f=fixture();imageField(f);const first=artwork(f);const container=first.parent;const group=new f.Shape();group.name='alternate';container.appendChild(group);artwork(f,'dragon.png',group);
- let result=preview(f,'card_id,name,art\n001,A,missing.png');assert.match(result.data.errors.join('\n'),/missing image/);
- result=preview(f,'card_id,name,art\n001,A,dragon.png');assert.match(result.data.errors.join('\n'),/multiple images/);
- result=preview(f,'card_id,name,art\n001,A,Artwork/alternate/dragon.png');assert.equal(result.data.errors.length,0);assert.equal(result.data.artworkMatches,1);
+ let result=preview(f,'card_id,name,art\n001,A,missing.png');assert.match(result.data.errors.join('\n'),/missing image/);assert.equal(result.data.artworkIssues,1);
+ result=preview(f,'card_id,name,art\n001,A,dragon.png');assert.match(result.data.errors.join('\n'),/multiple images/);assert.equal(result.data.artworkIssues,1);
+ result=preview(f,'card_id,name,art\n001,A,Artwork/alternate/dragon.png');assert.equal(result.data.errors.length,0);assert.equal(result.data.artworkMatches,1);assert.equal(result.data.artworkIssues,0);
  f.message('csv-apply',result.data.token);f.forge('fronts-single',saved(f));assert.equal(f.output().children[0].children.find(shape=>shape.name==='#art').fills[0].fillImage.id,group.children[0].fills[0].fillImage.id);
 });
 
