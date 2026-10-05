@@ -1,5 +1,9 @@
 
 import "./style.css";
+
+// Penpot includes the initial theme in the plugin URL (including hash routes).
+const initialTheme = new URLSearchParams(location.search || location.hash.split('?')[1] || '').get('theme');
+document.documentElement.dataset.theme = initialTheme === 'dark' ? 'dark' : 'light';
 import { initDeckSizing } from './deck-sizing-ui';
 import { cardPresets, formatDimensions, toPixels } from './card-sizes';
 import { newManualCard, duplicateManualCard } from './manual-cards';
@@ -55,6 +59,10 @@ function initMessageListener() {
   window.addEventListener("message", (event) => {
     if (event.source !== parent || !event.data || typeof event.data.type !== 'string') return;
     const message = event.data;
+    if (message.type === 'THEME_CHANGED') {
+      if (message.data === 'light' || message.data === 'dark') document.documentElement.dataset.theme = message.data;
+      return;
+    }
     if (message.type === 'PAGE_CONTEXT') {
       pageBinding = { pageId: message.pageId, session: message.session };
       cardsData = []; rowIds = []; cardFields = []; artworkAssets = []; artworkCells.clear(); imageTargets.clear();

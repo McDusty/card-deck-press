@@ -22,6 +22,7 @@ function sendUi(message: PluginUIEvent, context = deckSession.context) {
     penpot.ui.sendMessage({ ...message, ...context });
 }
 function loadPage() {
+    sendUi({ type: 'THEME_CHANGED', data: penpot.theme });
     sendUi({ type: 'PAGE_CONTEXT', data: deckSession.context });
     loadCardsData();
     loadCardFields();
@@ -36,6 +37,7 @@ penpot.on('pagechange', () => {
     imageTargets.clear();
     loadPage();
 });
+penpot.on('themechange', theme => sendUi({ type: 'THEME_CHANGED', data: theme }));
 
 
 

@@ -1,17 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400..900;1,400..900&display=swap"
-    rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200..700&display=swap" rel="stylesheet">
   <title>Card Forge Upgraded</title>
   <script type="module" crossorigin src="./index.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-tDanLBRh.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-D7q0WTrz.css">
 </head>
 
 <body>
@@ -21,10 +16,10 @@
       <span class="brand-name">Card Forge Upgraded</span>
     </div>
     <div class="tabs" role="tablist" aria-label="Deck workflow">
-      <button id="ts-create" data-tab="create" class="tab-selector current" type="button" role="tab" aria-controls="tab-create" aria-selected="true">CREATE DECK</button>
-      <button id="ts-cards" data-tab="cards" class="tab-selector" type="button" role="tab" aria-controls="tab-cards" aria-selected="false" tabindex="-1">EDIT DECK</button>
-      <button id="ts-export" data-tab="export" class="tab-selector" type="button" role="tab" aria-controls="tab-export" aria-selected="false" tabindex="-1">EXPORT</button>
-      <button id="ts-help" data-tab="help" class="tab-selector" type="button" role="tab" aria-controls="tab-help" aria-selected="false" tabindex="-1">HELP</button>
+      <button id="ts-create" data-tab="create" class="tab-selector current" type="button" role="tab" aria-controls="tab-create" aria-selected="true">Create Deck</button>
+      <button id="ts-cards" data-tab="cards" class="tab-selector" type="button" role="tab" aria-controls="tab-cards" aria-selected="false" tabindex="-1">Edit Deck</button>
+      <button id="ts-export" data-tab="export" class="tab-selector" type="button" role="tab" aria-controls="tab-export" aria-selected="false" tabindex="-1">Export</button>
+      <button id="ts-help" data-tab="help" class="tab-selector" type="button" role="tab" aria-controls="tab-help" aria-selected="false" tabindex="-1">Help</button>
     </div>
   </div>
   <div id="content">
@@ -47,16 +42,16 @@
         </div>
 
         <form id="create-deck-frm">
-          <div class="input-text"><label for="create-deck-name">DECK NAME</label><input id="create-deck-name" type="text" required="required"
+          <div class="input-text"><label for="create-deck-name">Deck name</label><input id="create-deck-name" type="text" required="required"
               value="Deck01" />
           </div>
           <div class="row-input">
             <div class="input-text">
-              <label for="create-deck-size">CARD SIZE</label>
+              <label for="create-deck-size">Card size</label>
               <select id="create-deck-size">
               </select>
             </div>
-            <div class="input-text"><label for="create-deck-orientation">DECK ORIENTATION</label>
+            <div class="input-text"><label for="create-deck-orientation">Orientation</label>
               <select id="create-deck-orientation">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
@@ -64,7 +59,7 @@
             </div>
           </div>
           <div class="row-input">
-            <div class="input-text"><label for="create-deck-units">MEASUREMENTS</label>
+            <div class="input-text"><label for="create-deck-units">Measurements</label>
               <select id="create-deck-units"><option value="px">Pixels (px)</option><option value="inch">Inches</option><option value="mm">Millimeters (mm)</option></select>
             </div>
           </div>
@@ -75,7 +70,7 @@
           <p id="create-size-note" role="status"></p>
           <p id="create-size-error" class="hidden" role="alert"></p>
           <div class="modal-buttons">
-            <button class="btn-primary" type="submit">CREATE DECK</button>
+            <button class="btn-primary" type="submit">Create Deck</button>
           </div>
         </form>
       </div>
@@ -113,10 +108,10 @@
     <div id="tab-cards" class="tab" role="tabpanel" aria-labelledby="ts-cards">
       <div id="cards-container">
         <div id="forge-entry" class="forge-entry" role="group" aria-label="Card actions">
-          <button id="upload-csv" class="btn-primary" type="button">IMPORT CSV</button>
-          <button id="correct-poker-size" class="btn-primary hidden" type="button">CORRECT POKER SIZE</button>
+          <button id="upload-csv" class="btn-primary" type="button">Import CSV</button>
+          <button id="correct-poker-size" class="btn-primary hidden" type="button">Correct Poker Size</button>
           <button id="refresh-artwork" type="button">Refresh Artwork</button>
-          <button id="add-card" class="btn-primary" type="button">ADD CARD</button>
+          <button id="add-card" class="btn-primary" type="button">Add Card</button>
         </div>
         <div id="template-size-panel" class="template-size-panel">
           <p id="template-size" role="status">Poker size: 750 × 1050 px (2.5 × 3.5 inches at 300 ppi).</p>
@@ -138,8 +133,8 @@
             <h3>No cards yet</h3>
             <p>Add your first card or import a CSV to fill this deck.</p>
             <div class="cards-empty-actions">
-              <button id="empty-import-csv" class="btn-primary" type="button">IMPORT CSV</button>
-              <button id="empty-add-card" class="btn-primary" type="button">ADD CARD</button>
+              <button id="empty-import-csv" class="btn-primary" type="button">Import CSV</button>
+              <button id="empty-add-card" class="btn-primary" type="button">Add Card</button>
             </div>
           </div>
         </div>
@@ -190,10 +185,10 @@
         </div>
 
         <form id="forge-frm">
-          <h3>EXPORT CARDS</h3>
+          <h3>Export cards</h3>
           <div class="row-input">
             <div class="input-text">
-              <label for="forge-type">OUTPUT LAYOUT</label>
+              <label for="forge-type">Output layout</label>
               <select id="forge-type">
                 <optgroup label="Fronts only — no backs">
                   <option value="fronts-single">Single fronts (no backs)</option>
@@ -212,7 +207,7 @@
                 </optgroup>
               </select>
             </div>
-            <div class="input-text"><label for="forge-cut-marks">WITH CUT LINES</label>
+            <div class="input-text"><label for="forge-cut-marks">Cut lines</label>
               <select id="forge-cut-marks">
                 <option value="false">No</option>
                 <option value="true">Yes</option>
