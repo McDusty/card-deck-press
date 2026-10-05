@@ -6,7 +6,7 @@ import { openArtworkPicker, refreshArtworkPicker } from './artwork-picker';
 interface Hooks {
   label: string;
   reference: string;
-  assetsUrl: string;
+  preview(image: HTMLImageElement, reference: string): void;
   assets: readonly ArtworkAsset[];
   choose(value: string): void;
   upload(event: Event): void;
@@ -59,7 +59,7 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
   });
   edit.addEventListener('click', () => openArtworkPicker({
     owner: element, label: hooks.label, assets: currentAssets, reference: currentReference,
-    assetsUrl: hooks.assetsUrl, choose, upload: () => file.click(),
+    preview: hooks.preview, choose, upload: () => file.click(),
   }));
   file.addEventListener('change', hooks.upload);
 
@@ -67,9 +67,7 @@ export function createArtworkCell(hooks: Hooks): ArtworkCell {
     currentAssets = assets; currentReference = reference;
     refreshArtworkPicker(element, assets, reference);
     const asset = assets.find(item => item.reference.split('|')[0] === reference.split('|')[0]);
-    preview.hidden = !reference;
-    if (reference) preview.src = hooks.assetsUrl + (asset?.reference ?? reference).split('|')[1];
-    else preview.removeAttribute('src');
+    hooks.preview(preview, asset?.reference ?? reference);
     if (!dirty) {
       setBusy(status, false);
       input.value = artworkName(assets, reference); input.setCustomValidity(''); input.removeAttribute('aria-invalid');

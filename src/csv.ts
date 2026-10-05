@@ -2,6 +2,7 @@ export interface CsvRow { line: number; values: string[] }
 export interface CsvTable { headers: string[]; rows: CsvRow[] }
 export const CSV_MAX_BYTES = 2 * 1024 * 1024;
 export const CSV_MAX_RECORDS = 500;
+export const CSV_MAX_COLUMNS = 100;
 
 // The Penpot controller does not expose the browser's TextEncoder API.
 // Count UTF-8 bytes directly, including surrogate pairs and replacement bytes
@@ -28,7 +29,10 @@ export function parseCsv(source: string): CsvTable {
   const records: CsvRow[] = [];
   let values: string[] = [], cell = '', quoted = false, closed = false;
   let line = 1, rowLine = 1, rowQuoted = false;
-  const pushCell = () => { values.push(cell); cell = ''; closed = false; };
+  const pushCell = () => {
+    if (values.length >= CSV_MAX_COLUMNS) throw new Error('CSV files support up to 100 columns.');
+    values.push(cell); cell = ''; closed = false;
+  };
   const pushRow = () => {
     pushCell();
     if (rowQuoted || values.length > 1 || values.some(value => value !== '')) records.push({ line: rowLine, values });
@@ -61,7 +65,6 @@ export function parseCsv(source: string): CsvTable {
   const header = records.shift();
   if (!header) throw new Error('The CSV is empty. Include a header row and at least one card.');
   const headers = header.values.map(value => value.trim());
-  if (headers.length > 100) throw new Error('CSV files support up to 100 columns.');
   if (headers.some(name => !name)) throw new Error('Every CSV column needs a name.');
   const names = headers.map(name => name.toLocaleLowerCase('en-US'));
   if (new Set(names).size !== names.length) throw new Error('CSV column names must be unique, including letter case.');

@@ -1,6 +1,8 @@
 
 import "./style.css";
 import { setBusy } from './busy-ui';
+import { initActionMenu } from './action-menu';
+let deckTools: ReturnType<typeof initActionMenu> | undefined;
 
 // Penpot includes the initial theme in the plugin URL (including hash routes).
 const initialTheme = new URLSearchParams(location.search || location.hash.split('?')[1] || '').get('theme');
@@ -13,6 +15,7 @@ import type { CardRecord } from './output-options';
 import { createSheetPdf, pdfFilename } from './sheet-pdf';
 import type { TemplateSizeInfo } from './template-size';
 import { initCsvUi } from './csv-ui';
+import { initGoogleSheetsUi } from './google-sheets-ui';
 import type { PageBinding } from './deck-session';
 import { ImageTargets, assignCardImage } from './image-targets';
 import type { ImageTarget } from './image-targets';
@@ -21,10 +24,14 @@ import { createArtworkCell } from './artwork-cell';
 import type { ArtworkCell } from './artwork-cell';
 import type { ArtworkAsset } from './artwork';
 import { closeArtworkPicker } from './artwork-picker';
+import { ArtworkPreviews } from './artwork-previews';
 let artworkAssets: ArtworkAsset[] = [];
 const artworkCells = new Map<string, ArtworkCell>();
 const artworkKey = (rowId: string, name: string) => JSON.stringify([rowId, name]);
-let csvMessage: ((type: string, data: unknown) => void) | undefined;
+let csvUi: ReturnType<typeof initCsvUi> | undefined;
+let sheetsUi: ReturnType<typeof initGoogleSheetsUi> | undefined;
+let rowsReadOnly = true;
+let pdfCheck: { id: string; resolve(): void; reject(error: Error): void } | null = null;
 
 import type {
   PluginUIEvent,
@@ -40,20 +47,20 @@ function listenerFunction(this: HTMLElement, ev: Event) {
 }
 */
 
-let assetsUrl = "";
 let sheetCutLines = true;
 let pdfReady = false;
 let pdfBusy = false;
-let pageBinding: PageBinding = { pageId: null, session: 0 };
+let pageBinding: PageBinding = { pageId: null, session: 0, epoch: 0 };
 let rowIds: string[] = [];
 const imageTargets = new ImageTargets();
 let editRevision = 0;
-let pdfOperation: { id: string; revision: number; session: number } | null = null;
+let pdfOperation: { id: string; revision: number; session: number; epoch: number } | null = null;
 let templateSizeInfo: TemplateSizeInfo = { templates: [], canCorrectPoker: false };
 
-function sendMessage(message: PluginUIEvent) {
-  parent.postMessage({ ...message, ...pageBinding }, '*');
+function sendMessage(message: PluginUIEvent, binding: PageBinding = pageBinding) {
+  parent.postMessage({ ...message, ...binding }, '*');
 }
+const artworkPreviews = new ArtworkPreviews((reference, requestId) => sendMessage({ type: 'artwork-thumbnail', data: reference, requestId }));
 
 
 function initMessageListener() {
@@ -68,18 +75,29 @@ function initMessageListener() {
       return;
     }
     if (message.type === 'PAGE_CONTEXT') {
+      deckTools?.close();
+      artworkPreviews.reset();
       setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
-      pageBinding = { pageId: message.pageId, session: message.session };
+      pageBinding = { pageId: message.pageId, session: message.session, epoch: message.epoch };
       cardsData = []; rowIds = []; cardFields = []; artworkAssets = []; artworkCells.clear(); imageTargets.clear();
       pdfOperation = null; setPdfBusy(false); invalidateOutput();
       loadCardFields(false); reloadCardEntries();
-      csvMessage?.('CSV_RESET', null);
+      csvUi?.message('CSV_RESET', null); sheetsUi?.reset(); sheetsUi?.awaitStatus(); rowsReadOnly = true;
+      pdfCheck?.reject(new Error('The active page changed.')); pdfCheck = null;
       createDeckShowError(false);
       return;
     }
     if (message.pageId !== pageBinding.pageId || message.session !== pageBinding.session) return;
+    if (message.type === 'SOURCE_CONTEXT') {
+      deckTools?.close();
+      artworkPreviews.reset();
+      pageBinding = { pageId: message.pageId, session: message.session, epoch: message.epoch };
+      imageTargets.clear(); closeArtworkPicker(); sheetsUi?.contextChanged(); csvUi?.contextChanged(); reloadCardEntries(); return;
+    }
+    if (message.epoch !== pageBinding.epoch) return;
+    artworkPreviews.message(message.type, message.data, message.requestId);
     if (message.type === 'CSV_APPLIED') { rowIds = message.rowIds; imageTargets.clear(); }
-    csvMessage?.(message.type, message.data);
+    csvUi?.message(message.type, message.data, message.changes); sheetsUi?.message(message.type, message.data);
     if (event.data.type == "ERROR_DECK_CREATE_PAGE_NOT_EMPTY") {
       createDeckShowError(true);
     } else if (event.data.type === 'DECK_SIZE_ERROR') {
@@ -87,7 +105,6 @@ function initMessageListener() {
     } else if (event.data.type == "CARDS_DATA") {
       loadCardsData(event.data.data, event.data.rowIds);
     } else if (event.data.type == "CARD_FIELDS") {
-      assetsUrl = document.referrer ? new URL('/assets/by-file-media-id/', document.referrer).href : event.data.data.assetsUrl;
       cardFields = event.data.data.fields;
       loadCardFields();
     } else if (event.data.type == "IMAGE_CREATED") {
@@ -95,7 +112,9 @@ function initMessageListener() {
     } else if (message.type === 'ARTWORK_SELECTED') {
       updateImageReference(message.data, message.data.reference);
     } else if (message.type === 'ARTWORK_LIST') {
+      artworkPreviews.reset();
       artworkAssets = message.data as ArtworkAsset[];
+      if (rowsReadOnly) reloadCardEntries();
       for (const [key, cell] of artworkCells) {
         const [rowId, name] = JSON.parse(key) as string[];
         const card = cardsData[rowIds.indexOf(rowId)];
@@ -108,7 +127,7 @@ function initMessageListener() {
       artworkCells.get(artworkKey(target.rowId, target.name))?.error(message.data.message);
       showDeckError(message.data.message);
     } else if (message.type === 'DECK_ERROR') {
-      showDeckError(message.data);
+      showDeckError(message.data); sendMessage({ type: 'load-cards-data', data: null });
     } else if (event.data.type == "PAGE_EMPTY") {
       if (event.data.data) {
         changeTab("create");
@@ -149,8 +168,12 @@ function initMessageListener() {
       if (pdfOperation && pdfOperation.id === message.requestId) void downloadPdfImages(message.data, pdfOperation);
     } else if (event.data.type === 'PDF_EXPORT_ERROR') {
       if (pdfOperation?.id !== message.requestId) return;
+      pdfCheck?.reject(new Error(String(message.data))); pdfCheck = null;
+      sendMessage({ type: 'pdf-finish', requestId: message.requestId, data: null });
       pdfOperation = null; setPdfBusy(false);
       showForgeError(event.data.data);
+    } else if (message.type === 'PDF_CHECKED') {
+      const check = pdfCheck; if (check && check.id === message.requestId) { check.resolve(); pdfCheck = null; }
     } else if (event.data.type === 'OUTPUT_SETTINGS') {
       const settings = event.data.data;
       if (settings && typeof settings.type === 'string' && (isFaceMode(settings.type) || ['standard', 'printplay', 'tabletop'].includes(settings.type))) {
@@ -159,7 +182,7 @@ function initMessageListener() {
           (document.getElementById('forge-paper') as HTMLSelectElement).value = settings.paper;
         }
         if (typeof settings.cutMarks === 'boolean') sheetCutLines = settings.cutMarks;
-        changeForgeType();
+        changeForgeType(false);
       }
     }
   });
@@ -172,6 +195,7 @@ const tabSelectors = document.querySelectorAll<HTMLButtonElement>('.tab-selector
 const tabs = document.querySelectorAll('.tab');
 
 function changeTab(name: string) {
+  deckTools?.close();
   for (const element of tabSelectors) {
     const selected = element.dataset.tab === name;
     element.classList.toggle('current', selected);
@@ -278,6 +302,7 @@ let cardsData: CardRecord[] = [];
 
 
 function saveCardsData() {
+  if (rowsReadOnly) return;
   invalidateOutput();
   sendMessage({ type: 'save-cards-data', data: JSON.stringify(cardsData), rowIds });
 }
@@ -292,6 +317,7 @@ function updateImageInfo(target: ImageTarget, id: string, imageId: string) {
 }
 
 function updateImageReference(target: ImageTarget, reference: string) {
+  if (rowsReadOnly) return;
   if (!imageTargets.matches(target)) return;
   imageTargets.finish(target);
   if (!assignCardImage(cardsData, rowIds, target, reference)) return;
@@ -302,7 +328,7 @@ function updateImageReference(target: ImageTarget, reference: string) {
 }
 
 function chooseCardArtwork(rowId: string, session: number, name: string, value: string) {
-  if (pageBinding.session !== session || !rowIds.includes(rowId)) return;
+  if (rowsReadOnly || pageBinding.session !== session || !rowIds.includes(rowId)) return;
   const target = { rowId, name, uploadId: crypto.randomUUID() };
   imageTargets.start(target);
   invalidateOutput();
@@ -319,7 +345,8 @@ function loadCardsData(data: string, identities: string[]) {
 function createCardEntry(num: number, cardData: CardRecord) {
   const rowId = rowIds[num - 1];
   const entrySession = pageBinding.session;
-  const currentIndex = () => pageBinding.session === entrySession ? rowIds.indexOf(rowId) : -1;
+  const entryEpoch = pageBinding.epoch;
+  const currentIndex = () => pageBinding.session === entrySession && pageBinding.epoch === entryEpoch ? rowIds.indexOf(rowId) : -1;
   let entry = document.createElement("div");
   entry.classList.add("card-entry");
   entry.id = "card-entry-" + num;
@@ -329,7 +356,7 @@ function createCardEntry(num: number, cardData: CardRecord) {
 
   let copy = document.createElement("button");
   copy.type = 'button'; copy.setAttribute('aria-label', `Duplicate card ${num}`);
-  copy.classList.add("card-action-copy");
+  copy.classList.add("card-action-copy", "btn-primary");
   copy.addEventListener("click", () => { currentIndex() >= 0 && copyCard(currentIndex() + 1) });
   actions.appendChild(copy);
 
@@ -337,7 +364,9 @@ function createCardEntry(num: number, cardData: CardRecord) {
   del.type = 'button'; del.setAttribute('aria-label', `Delete card ${num}`);
   del.classList.add("card-action-delete");
   del.addEventListener("click", () => { currentIndex() >= 0 && deleteCard(currentIndex() + 1) });
-  actions.appendChild(del);
+  const deleteActions = document.createElement('div'); deleteActions.className = 'card-delete-actions';
+  if (!rowsReadOnly) deleteActions.appendChild(del);
+  entry.appendChild(deleteActions);
 
   let number = document.createElement("div");
   number.classList.add("card-num");
@@ -347,20 +376,20 @@ function createCardEntry(num: number, cardData: CardRecord) {
   if (cardsData.some(card => card.card_id !== undefined)) {
     const div = document.createElement('div'); div.className = 'card-text';
     const input = document.createElement('input'); input.value = cardData.card_id ?? '';
-    input.setAttribute('aria-label', `Card ID for card ${num}`);
-    input.addEventListener('input', () => saveCardText(rowId, entrySession, 'card_id', input.value));
+    input.setAttribute('aria-label', `Card ID for card ${num}`); input.readOnly = rowsReadOnly;
+    input.addEventListener('input', () => { if (currentIndex() >= 0) saveCardText(rowId, entrySession, 'card_id', input.value); });
     div.appendChild(input); entry.appendChild(div);
   }
 
   const quantityCell = document.createElement('div'); quantityCell.className = 'card-quantity';
   const quantityInput = document.createElement('input');
-  quantityInput.type = 'number'; quantityInput.min = '0'; quantityInput.max = '100'; quantityInput.step = '1'; quantityInput.required = true;
+  quantityInput.readOnly = rowsReadOnly; quantityInput.type = 'number'; quantityInput.min = '0'; quantityInput.max = '100'; quantityInput.step = '1'; quantityInput.required = true;
   quantityInput.value = cardData.quantity ?? '1';
   quantityInput.setAttribute('aria-label', `Quantity for card ${num}`);
   quantityInput.title = 'Number of printed copies (0–100). Use 0 to exclude this card.';
   quantityInput.addEventListener('input', () => {
     const value = quantityInput.validity.valid ? String(quantityInput.valueAsNumber) : quantityInput.value;
-    saveCardText(rowId, entrySession, 'quantity', value);
+    if (currentIndex() >= 0) saveCardText(rowId, entrySession, 'quantity', value);
   });
   quantityInput.addEventListener('change', () => quantityInput.reportValidity());
   quantityCell.appendChild(quantityInput); entry.appendChild(quantityCell);
@@ -372,21 +401,27 @@ function createCardEntry(num: number, cardData: CardRecord) {
       div.classList.add("card-text");
 
       let input = document.createElement("textarea");
-      input.rows = 1;
+      input.rows = 1; input.readOnly = rowsReadOnly;
       input.setAttribute('aria-label', `${field.name.substring(1)} for card ${num}`);
       if (Object.prototype.hasOwnProperty.call(cardData, field.name)) {
         input.value = cardData[field.name];
       }
-      input.addEventListener("input", () => { saveCardText(rowId, entrySession, field.name, input.value) });
+      input.addEventListener("input", () => { if (currentIndex() >= 0) saveCardText(rowId, entrySession, field.name, input.value); });
       div.appendChild(input);
 
       entry.appendChild(div);
     } else {
+      if (rowsReadOnly) {
+        const container = document.createElement('div'); container.className = 'card-image card-image-readonly';
+        const reference = cardData[field.name] ?? ''; const asset = artworkAssets.find(item => item.reference.split('|')[0] === reference.split('|')[0]);
+        if (reference) { const image = document.createElement('img'); image.className = 'card-image-preview'; image.alt = ''; container.appendChild(image); artworkPreviews.show(image, asset?.reference ?? reference); }
+        const label = document.createElement('span'); label.textContent = asset?.name ?? (reference ? 'Artwork image' : 'No image'); container.appendChild(label); entry.appendChild(container); continue;
+      }
       const cell = createArtworkCell({
         label: `${field.name.substring(1)} for card ${num}`,
-        reference: cardData[field.name] ?? '', assets: artworkAssets, assetsUrl,
-        choose: value => chooseCardArtwork(rowId, entrySession, field.name, value),
-        upload: event => { void saveCardImage(rowId, entrySession, field.name, event); },
+        reference: cardData[field.name] ?? '', assets: artworkAssets, preview: (image, reference) => artworkPreviews.show(image, reference),
+        choose: value => { if (currentIndex() >= 0) chooseCardArtwork(rowId, entrySession, field.name, value); },
+        upload: event => { if (currentIndex() >= 0) void saveCardImage(rowId, entrySession, field.name, event); },
         draft: () => { imageTargets.cancel(rowId, field.name); invalidateOutput(); },
       });
       artworkCells.set(artworkKey(rowId, field.name), cell);
@@ -394,11 +429,12 @@ function createCardEntry(num: number, cardData: CardRecord) {
     }
   }
 
-  entry.appendChild(actions);
+  if (!rowsReadOnly) entry.appendChild(actions);
   return entry;
 }
 
 function addEmptyCard() {
+  if (rowsReadOnly) return;
   const cardData = { ...newManualCard(cardsData), ...Object.fromEntries(cardFields.map(field => [field.name, ''])) };
   cardsData.push(cardData);
   rowIds.push(crypto.randomUUID());
@@ -406,11 +442,12 @@ function addEmptyCard() {
   cardList?.appendChild(entry);
   updateCardsEmptyState();
   saveCardsData();
-  cardList.scrollTop = cardList?.scrollHeight;
+  entry.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   entry.querySelector<HTMLTextAreaElement>('textarea')?.focus();
 }
 
 function deleteCard(num: number) {
+  if (rowsReadOnly) return;
   cardsData.splice((num - 1), 1);
   rowIds.splice(num - 1, 1);
   imageTargets.retainRows(rowIds);
@@ -419,6 +456,7 @@ function deleteCard(num: number) {
 }
 
 function copyCard(num: number) {
+  if (rowsReadOnly) return;
   const card = duplicateManualCard(cardsData[num - 1], cardsData);
   cardsData.splice(num - 1, 0, card);
   rowIds.splice(num - 1, 0, crypto.randomUUID());
@@ -428,6 +466,7 @@ function copyCard(num: number) {
 }
 
 function saveCardText(rowId: string, session: number, name: string, val: string) {
+  if (rowsReadOnly) return;
   const index = rowIds.indexOf(rowId);
   if (pageBinding.session !== session || index < 0) return;
   cardsData[index][name] = val;
@@ -435,7 +474,7 @@ function saveCardText(rowId: string, session: number, name: string, val: string)
 }
 
 async function saveCardImage(rowId: string, session: number, name: string, event: Event) {
-  if (pageBinding.session !== session || !rowIds.includes(rowId)) return;
+  if (rowsReadOnly || pageBinding.session !== session || !rowIds.includes(rowId)) return;
   const fileInput = event.target as HTMLInputElement;
   const file = fileInput.files?.[0];
   if (!file) return;
@@ -447,10 +486,10 @@ async function saveCardImage(rowId: string, session: number, name: string, event
   try {
     if (file.size > 32 * 1024 * 1024) throw new Error('Choose an image smaller than 32 MiB.');
     const data = new Uint8Array(await file.arrayBuffer());
-    if (pageBinding.session !== context.session || !rowIds.includes(target.rowId) || !imageTargets.matches(target)) return;
+    if (rowsReadOnly || pageBinding.epoch !== context.epoch || pageBinding.session !== context.session || !rowIds.includes(target.rowId) || !imageTargets.matches(target)) return;
     sendMessage({ type: 'create-image-data', data: { ...target, data, mimeType: file.type, filename: file.name } });
   } catch (error) {
-    if (pageBinding.session === context.session && imageTargets.matches(target)) {
+    if (!rowsReadOnly && pageBinding.epoch === context.epoch && pageBinding.session === context.session && imageTargets.matches(target)) {
       imageTargets.finish(target);
       const text = error instanceof Error ? error.message : 'Could not read the image.';
       artworkCells.get(artworkKey(rowId, name))?.error(text); showDeckError(text);
@@ -564,7 +603,7 @@ function requestPdf() {
   showForgeError('');
   setPdfBusy(true);
   setPdfStatus('Preparing print PDF…');
-  pdfOperation = { id: crypto.randomUUID(), revision: editRevision, session: pageBinding.session };
+  pdfOperation = { id: crypto.randomUUID(), revision: editRevision, session: pageBinding.session, epoch: pageBinding.epoch };
   sendMessage({ type: 'export-front-pdf', requestId: pdfOperation.id, data: {
     cardsData,
     type: (document.getElementById('forge-type') as HTMLSelectElement).value,
@@ -577,13 +616,19 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
   let url: string | undefined;
   try {
     const assertCurrent = () => {
-      if (pdfOperation !== operation || editRevision !== operation.revision || pageBinding.session !== operation.session) throw new Error('The deck changed during export. Generate again before downloading.');
+      if (pdfOperation !== operation || editRevision !== operation.revision || pageBinding.session !== operation.session || pageBinding.epoch !== operation.epoch) throw new Error('The deck changed during export. Generate again before downloading.');
     };
     assertCurrent();
     const images = data.pages.map(page => page instanceof Uint8Array ? page : new Uint8Array(page));
     const bytes = await createSheetPdf(images, data.paper, { assertCurrent, landscape: data.landscape, pageSize: data.pageSize });
     assertCurrent();
     if (bytes.byteLength > 256 * 1024 * 1024) throw new Error('The PDF exceeds the 256 MiB download limit.');
+    await new Promise<void>((resolve, reject) => {
+      const timeout = setTimeout(() => { if (pdfCheck?.id === operation.id) { pdfCheck = null; reject(new Error('PDF confirmation timed out. Generate again.')); } }, 20_000);
+      pdfCheck = { id: operation.id, resolve: () => { clearTimeout(timeout); resolve(); }, reject: issue => { clearTimeout(timeout); reject(issue); } };
+      sendMessage({ type: 'pdf-check', requestId: operation.id, data: null });
+    });
+    assertCurrent();
     url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -595,6 +640,7 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
   } catch (error) {
     if (pdfOperation === operation) showForgeError(error instanceof Error ? error.message : 'PDF download failed. Try again.');
   } finally {
+    sendMessage({ type: 'pdf-finish', requestId: operation.id, data: null });
     if (pdfOperation === operation) { pdfOperation = null; setPdfBusy(false); }
     if (url) setTimeout(() => URL.revokeObjectURL(url!), 30_000);
   }
@@ -715,14 +761,21 @@ function renderHelpCardSizes() {
 //////////////////////////// ONLOAD
 
 window.onload = (_event) => {
+  deckTools = initActionMenu(document.getElementById('deck-tools-toggle') as HTMLButtonElement, document.getElementById('deck-tools-menu')!);
   initMessageListener();
   initTabSelectors();
   initCreateDeck();
   initCards();
-  csvMessage = initCsvUi({
-    send: (type, data) => sendMessage({ type, data }),
+  csvUi = initCsvUi({
+    context: () => pageBinding,
+    send: (type, data, binding) => sendMessage({ type, data }, binding),
     apply: cards => { cardsData = cards; loadCardFields(false); reloadCardEntries(); },
     invalidate: invalidateOutput,
+  });
+  sheetsUi = initGoogleSheetsUi({ context: () => pageBinding,
+    send: (type, data, binding) => sendMessage({ type, data }, binding),
+    preview: (read, binding) => csvUi?.openSheet(read, binding),
+    authority: readOnly => { if (rowsReadOnly !== readOnly) { rowsReadOnly = readOnly; imageTargets.clear(); reloadCardEntries(); } },
   });
   renderHelpCardSizes();
 

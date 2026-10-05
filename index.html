@@ -106,56 +106,123 @@
     <div id="tab-cards" class="tab" role="tabpanel" aria-labelledby="ts-cards">
       <div id="cards-container">
         <div id="forge-entry" class="forge-entry" role="group" aria-label="Card actions">
-          <button id="upload-csv" class="btn-primary" type="button">Import CSV</button>
-          <button id="correct-poker-size" class="btn-primary hidden" type="button">Correct Poker Size</button>
-          <button id="refresh-artwork" type="button">Refresh Artwork</button>
-          <button id="add-card" class="btn-primary" type="button">Add Card</button>
+          <div class="action-primary">
+            <button id="upload-csv" class="btn-primary" type="button" disabled><span class="button-icon icon-import" aria-hidden="true"></span>Import CSV</button>
+            <button id="google-sheet" class="btn-primary" type="button" disabled><span class="button-icon icon-sheet" aria-hidden="true"></span>Google Sheet</button>
+            <button id="add-card" class="btn-primary" type="button" disabled><span class="button-icon icon-add" aria-hidden="true"></span>Add Card</button>
+          </div>
         </div>
+        <section id="sheet-source" class="sheet-source hidden" aria-label="Deck data source">
+          <p id="sheet-source-copy" role="status"></p>
+          <div class="action-bar">
+            <button id="sheet-disconnect" class="btn-danger" type="button">Disconnect</button>
+            <div class="action-primary">
+              <a id="sheet-open" href="#" target="_blank" rel="noopener noreferrer">Open Sheet</a>
+              <button id="sheet-change" type="button">Change Link</button>
+              <button id="sheet-recover" class="btn-primary hidden" type="button">Recover interrupted import</button>
+              <button id="sheet-pull" class="btn-primary" type="button">Pull Latest</button>
+            </div>
+          </div>
+        </section>
         <div id="template-size-panel" class="template-size-panel">
           <p id="template-size" role="status">Poker size: 750 × 1050 px (2.5 × 3.5 inches at 300 ppi).</p>
           <p id="template-size-note" class="hidden" role="status"></p>
           <p id="csv-deck-status" class="hidden" role="status"></p>
-          <div class="csv-backup-actions">
-            <button id="csv-export" type="button">Export CSV</button>
-            <button id="csv-export-safe" type="button">Export for spreadsheets</button>
-            <button id="csv-restore" type="button" disabled>Restore previous import</button>
-          </div>
         </div>
-        <div id="cards-header" class="cards-header">
-          <div class="card-num">NUM</div>
-          <div id="cards-header-actions" class="card-num"></div>
+        <div class="cards-table-heading">
+          <div id="cards-header" class="cards-header">
+            <div class="card-delete-actions" aria-hidden="true"></div>
+            <div class="card-num">NUM</div>
+            <div id="cards-header-actions" class="card-num"></div>
+          </div>
+          <div class="deck-tools">
+            <button id="deck-tools-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="deck-tools-menu"><span class="button-icon icon-more" aria-hidden="true"></span>More actions</button>
+            <div id="deck-tools-menu" class="deck-tools-menu" role="menu" aria-labelledby="deck-tools-toggle" hidden>
+              <button id="refresh-artwork" type="button" role="menuitem" tabindex="-1"><span class="button-icon icon-refresh" aria-hidden="true"></span>Refresh Artwork</button>
+              <button id="csv-export" type="button" role="menuitem" tabindex="-1"><span class="button-icon icon-download" aria-hidden="true"></span>Export CSV</button>
+              <button id="csv-export-safe" type="button" role="menuitem" tabindex="-1"><span class="button-icon icon-sheet" aria-hidden="true"></span>Export for spreadsheets</button>
+              <button id="csv-restore" type="button" role="menuitem" tabindex="-1" disabled><span class="button-icon icon-restore" aria-hidden="true"></span>Restore Previous State</button>
+              <button id="correct-poker-size" class="hidden" type="button" role="menuitem" tabindex="-1"><span class="button-icon icon-size" aria-hidden="true"></span>Correct Poker Size</button>
+            </div>
+          </div>
         </div>
         <p id="cards-fields-note" class="cards-fields-note" role="status">Card details come from the Front template in Penpot. Open Card Deck Press inside Penpot and add text layers such as #name or #rules to Front, then reopen the plugin to load those fields.</p>
         <div id="card-list" class="cards-list">
           <div id="cards-empty" class="cards-empty">
             <h3>No cards yet</h3>
-            <p>Add your first card or import a CSV to fill this deck.</p>
+            <p>Add your first card, import CSV, or connect a Google Sheet to fill this deck.</p>
             <div class="cards-empty-actions">
-              <button id="empty-import-csv" class="btn-primary" type="button">Import CSV</button>
-              <button id="empty-add-card" class="btn-primary" type="button">Add Card</button>
+              <button id="empty-import-csv" class="btn-primary" type="button" disabled><span class="button-icon icon-import" aria-hidden="true"></span>Import CSV</button>
+              <button id="empty-google-sheet" class="btn-primary" type="button" disabled><span class="button-icon icon-sheet" aria-hidden="true"></span>Google Sheet</button>
+              <button id="empty-add-card" class="btn-primary" type="button" disabled><span class="button-icon icon-add" aria-hidden="true"></span>Add Card</button>
             </div>
           </div>
         </div>
       </div>
+      <section id="sheet-panel" class="csv-panel hidden" aria-labelledby="sheet-heading">
+        <h3 id="sheet-heading">Connect Google Sheet</h3>
+        <form id="sheet-form">
+          <label for="sheet-link">Google Sheet URL</label>
+          <input id="sheet-link" type="url" required placeholder="https://docs.google.com/spreadsheets/d/…/edit?gid=…" aria-describedby="sheet-permissions" />
+          <a id="sheet-open-draft" class="hidden" href="#" target="_blank" rel="noopener noreferrer">Open Sheet</a>
+          <p id="sheet-loading" role="status" aria-live="polite"></p>
+          <p id="sheet-error" class="hidden" role="alert"></p>
+          <div class="modal-buttons">
+            <div class="action-primary action-pair">
+              <button id="sheet-cancel" type="button">Cancel</button>
+              <button id="sheet-read" class="btn-primary" type="submit">Read Sheet</button>
+            </div>
+          </div>
+          <div class="sheet-guidance">
+            <p id="sheet-permissions">In Google Sheets, choose Share → General access → Anyone with the link → Viewer. Allow viewers to download. Select the worksheet tab you want, then paste its link here. Private sheets that require sign-in cannot be read.</p>
+            <p>One worksheet connects to this Penpot page. Review changes before applying. Once connected, edit cards in the sheet and use Pull Latest here.</p>
+          </div>
+        </form>
+      </section>
+      <dialog id="sheet-disconnect-dialog" aria-labelledby="sheet-disconnect-heading">
+        <h3 id="sheet-disconnect-heading">Disconnect Google Sheet?</h3>
+        <p>Your current cards stay in this deck. Manual editing and CSV import become available again. Future sheet updates will no longer be pulled.</p>
+        <div class="action-bar">
+          <button id="sheet-disconnect-confirm" class="btn-danger" type="button">Disconnect and keep cards</button>
+          <div class="action-primary"><button id="sheet-disconnect-cancel" type="button">Cancel</button></div>
+        </div>
+      </dialog>
+      <dialog id="csv-restore-dialog" aria-labelledby="csv-restore-heading">
+        <h3 id="csv-restore-heading">Restore Previous State?</h3><p id="csv-restore-copy"></p>
+        <div class="modal-buttons"><div class="action-primary action-pair"><button id="csv-restore-cancel" type="button">Cancel</button><button id="csv-restore-confirm" class="btn-primary" type="button">Restore Previous State</button></div></div>
+      </dialog>
       <section id="csv-panel" class="csv-panel hidden" aria-labelledby="csv-heading">
-        <div class="csv-actions">
-          <h3 id="csv-heading">Import CSV</h3>
-          <button id="csv-cancel" type="button">Cancel</button>
-          <button id="csv-apply" class="btn-primary" type="button" disabled>Apply import</button>
+        <div class="csv-review-header">
+          <div class="csv-actions">
+            <h3 id="csv-heading">Import CSV</h3>
+            <div class="action-primary action-pair">
+              <button id="csv-cancel" type="button">Cancel</button>
+              <button id="csv-apply" class="btn-primary" type="button" disabled>Apply Changes</button>
+            </div>
+          </div>
+          <p id="csv-error" class="hidden" role="alert"></p>
         </div>
         <p>Map spreadsheet columns to card fields. Every card needs a unique ID. Quantities default to 1.</p>
         <input id="csv-file" class="hidden" type="file" accept=".csv,text/csv" />
         <input id="artwork-files" class="hidden" type="file" accept="image/*" multiple />
-        <div class="csv-tools">
-          <button id="csv-choose" type="button">Choose CSV</button>
-          <button id="csv-sample" type="button">Download sample</button>
-          <button id="csv-add-artwork" type="button">Add artwork images</button>
-          <button id="csv-refresh" type="button">Refresh matches</button>
+        <div class="csv-tools action-bar">
+          <div class="action-primary">
+            <button id="csv-choose" type="button">Choose CSV</button>
+            <button id="csv-sample" class="btn-primary" type="button">Download sample</button>
+            <button id="csv-add-artwork" class="btn-primary" type="button">Add artwork images</button>
+            <button id="csv-refresh" class="hidden" type="button" disabled><span class="button-icon icon-refresh" aria-hidden="true"></span>Check again</button>
+          </div>
         </div>
-        <p id="csv-filename"></p>
-        <p>Image columns match image names in Artwork, with or without file extensions. Exact matches take priority. Use Artwork/folder/image.png to resolve duplicate names.</p>
+        <p id="csv-source-note" class="hidden"></p>
         <p id="csv-summary" role="status"></p>
-        <p id="csv-error" class="hidden" role="alert"></p>
+        <details id="csv-details" class="csv-details">
+          <summary>Import details</summary>
+          <p id="csv-filename"></p>
+          <p id="csv-readout"></p>
+          <div id="csv-changes" aria-label="Changed card IDs"></div>
+          <p>Image names match Artwork layers, with or without file extensions. Exact matches take priority. Use <code>Artwork/folder/image.png</code> for duplicate names.</p>
+          <p>Uploaded images stay in Artwork if you cancel the import.</p>
+        </details>
         <div id="csv-mapping"></div>
         <h3>First five rows</h3>
         <div id="csv-preview-table"></div>
@@ -231,9 +298,13 @@
           <p id="pdf-status" class="hidden" role="status" aria-live="polite"></p>
 
           <div class="modal-buttons">
-            <button id="box-forge-cancel" type="button" class="btn-primary btn-cancel">Back to Edit Deck</button>
-            <button id="download-pdf" type="button" class="btn-primary btn-line hidden">Download PDF</button>
-            <button id="box-forge-ok" type="submit" class="btn-primary">Generate Cards</button>
+            <div class="action-primary">
+              <button id="download-pdf" type="button" class="btn-primary hidden">Download PDF</button>
+              <div class="action-pair">
+                <button id="box-forge-cancel" type="button">Back to Edit Deck</button>
+                <button id="box-forge-ok" type="submit" class="btn-primary">Generate Cards</button>
+              </div>
+            </div>
           </div>
         </form>
       </div>
@@ -305,8 +376,9 @@
             </section>
             <section id="help-edit" aria-labelledby="help-edit-heading">
               <h2 id="help-edit-heading">Edit cards</h2>
-              <p><strong>Import CSV</strong> stays on the left and <strong>Add Card</strong> on the right of the top toolbar in <strong>Edit Deck</strong>.</p>
-              <p>An empty deck also shows these two buttons inside the card table. Use either location to start.</p>
+              <p>Local decks show <strong>Import CSV</strong>, <strong>Google Sheet</strong>, and <strong>Add Card</strong> in the top toolbar of <strong>Edit Deck</strong>.</p>
+              <p>An empty deck also shows these three actions inside the card table. Connected decks show <strong>Open Sheet</strong> and <strong>Pull Latest</strong>; edit or add rows in Google Sheets.</p>
+              <p>The table header's <strong>More actions</strong> menu contains <strong>Refresh Artwork</strong>, both CSV exports, <strong>Restore Previous State</strong>, and template correction when available.</p>
               <ul>
                 <li><strong>Add Card:</strong> add a row and enter its text or image values.</li>
                 <li><strong>Quantity:</strong> set the number of printed copies for that row. New cards start at 1. Use whole numbers from 0 to 100; 0 excludes the card from output.</li>
@@ -316,18 +388,28 @@
               <p><strong>Example:</strong> add one Healing card and set Quantity to <strong>10</strong>. Print sheets include ten copies without needing ten rows. Editing the row updates every copy the next time you generate cards.</p>
               <p>Quantities repeat cards in six-up, nine-up, back sheets, and fold-over layouts. Single-card, Standard, and Tabletop layouts include each nonzero design once. Older cards without a quantity count as 1.</p>
               <p>Changing Penpot pages reloads the editor for the new page. Image uploads stay attached to their original card; uploads for a removed card or a previous page are discarded.</p>
-              <p>Text fields support multiple lines. After a CSV import, you can also edit <strong>Card ID</strong>. Keep IDs unique when preparing another import. The CSV <code>quantity</code> column uses the same Quantity field.</p>
+              <p>Text fields support multiple lines. In local mode after a CSV import, you can also edit <strong>Card ID</strong>. Keep IDs unique when preparing another import. The CSV <code>quantity</code> column uses the same Quantity field.</p>
               <p>Card edits are saved on the Penpot page. When you are ready, open the <strong>Export tab</strong> at the top and click <strong>Generate Cards</strong>. Repeat this after editing cards to update the output.</p>
             </section>
             <section id="help-csv" aria-labelledby="help-csv-heading">
               <h2 id="help-csv-heading">Import CSV or Google Sheets data</h2>
-              <p>For <strong>Google Sheets</strong>, download the sheet as CSV, then upload that file. A direct Sheets connection is not available yet.</p>
+              <h3>Connect a Google Sheet</h3>
+              <ol>
+                <li>In Google Sheets, choose <strong>Share → General access → Anyone with the link → Viewer</strong>. Allow viewers to download. Private sheets requiring sign-in are not supported.</li>
+                <li>Select the worksheet tab containing your cards. It needs a header and at least one card row. Copy its normal Google Sheets URL, including <code>gid=</code>.</li>
+                <li>In <strong>Edit Deck</strong>, click <strong>Google Sheet</strong>, paste the link, and choose <strong>Read Sheet</strong>.</li>
+                <li>Map columns, resolve artwork matches, and review all added, changed, and removed IDs and any order changes. Click <strong>Apply Changes</strong> to replace the deck and save the connection. Cancel keeps the existing cards and connection.</li>
+              </ol>
+              <p>Each Penpot page keeps one worksheet connection. Connected card rows are read-only: use <strong>Open Sheet</strong> to edit or add cards, then <strong>Pull Latest</strong> to review and apply changes. Updates are read-only and happen only when requested; the plugin never writes to your sheet or polls it automatically.</p>
+              <p><strong>Change Link</strong> previews another worksheet before replacing the saved connection. <strong>Disconnect</strong> keeps your current cards and restores manual editing and CSV import. <strong>Restore Previous State</strong> shows whether the saved snapshot restores local editing or a Sheets connection before applying it.</p>
+              <p>Use stable, unique <code>card_id</code> values. Sheets exports displayed cell values; format IDs as plain text before entering values such as <code>001</code>. Image cells contain existing Artwork names, not remote image URLs. A failed read or invalid preview keeps your current deck.</p>
+              <h3>Import a CSV file</h3>
               <p>Use <code>quantity</code> as the CSV column header to map it automatically to each card's Quantity. For example, <code>001,10,Healing</code> under <code>card_id,quantity,name</code> prints ten Healing cards on sheets. If the quantity column is omitted, every row defaults to 1.</p>
               <ol>
                 <li>In <strong>Edit Deck</strong>, choose <strong>Import CSV</strong> from the toolbar or the empty card table. You can also use <strong>Download sample</strong> in the import view.</li>
                 <li>Map columns to <strong>Card ID</strong>, <strong>Quantity</strong>, a template field, or <strong>Ignore</strong>. Matching names map automatically: <code>name</code> → <code>#name</code>.</li>
-                <li>Review the first five rows, printed-copy count, artwork matches, and added / changed / removed counts.</li>
-                <li>Fix any reported errors. Click <strong>Apply import</strong> to replace the whole card list, or <strong>Cancel</strong> to keep it.</li>
+                <li>Review the first five rows, printed-copy count, artwork matches, and expandable added / changed / removed ID lists. Check whether card order changes.</li>
+                <li>Fix any reported errors. Click <strong>Apply Changes</strong> to replace the whole card list, or <strong>Cancel</strong> to keep it.</li>
                 <li>Open <strong>Export</strong> and click <strong>Generate Cards</strong> to update the output.</li>
               </ol>
               <div class="help-table-wrap">
@@ -363,7 +445,7 @@ Second line",dragon.png
               </ol>
               <h3>Add images manually</h3>
               <p>In <strong>Edit Deck</strong>, each image cell has one name field and a pencil button. Type an exact Artwork image name, then press Enter or leave the field to match it. Or click the <strong>pencil button</strong> to open the image picker, search by name, and choose a thumbnail. Use a full path to distinguish duplicate names, such as <code>Artwork/creatures/dragon.png</code>.</p>
-              <p>In the picker, click <strong>Upload image</strong> to add a new image. It is saved in Artwork with its filename and assigned to this card, ready to reuse in other rows or CSV imports. <strong>Clear image</strong> removes the image from this card without deleting it from Artwork. Close the picker or press Escape to keep the current image.</p>
+              <p>In the picker, click <strong>Upload image</strong> to add a new image. It is saved in Artwork with its filename and assigned to this card, ready to reuse in other rows or CSV imports. <strong>Clear image</strong> removes the image from this card without deleting it from Artwork. Click <strong>Cancel</strong> or press Escape to keep the current image.</p>
               <p>After adding or renaming images directly in Penpot, click <strong>Refresh Artwork</strong> to update the choices. Missing or ambiguous names show an error; resolve them before generating fronts. Open <strong>Export</strong> and click <strong>Generate Cards</strong> to use your changes.</p>
               <h3>Match images from CSV</h3>
               <p>Place your source images in the <strong>Artwork</strong> frame as rectangles with image fills. Name each image rectangle with its exact filename, such as <code>healing.png</code>.</p>
@@ -371,12 +453,13 @@ Second line",dragon.png
               <pre><code>card_id,name,art,quantity
 001,Healing,healing.png,10</code></pre>
               <p>The Artwork image rectangle must be named <code>healing.png</code>. After applying the import, generate cards in <strong>Export</strong>. Print sheets include ten copies of this Healing card using that image.</p>
-              <p>In the import view, choose <strong>Add artwork images</strong> to upload a batch into Artwork. Each image gets its filename as its layer name.</p>
+              <p>In the import view, choose <strong>Add artwork images</strong> to upload a batch into Artwork. Each image gets its filename as its layer name. Uploading images and changing column mappings automatically recheck the preview.</p>
+              <p><strong>Check again</strong> appears when artwork matches need fixing or the import needs another review after an error. Use it after correcting artwork in Penpot. It rechecks the current preview; use <strong>Pull Latest</strong> to read updated Google Sheet rows.</p>
               <p>You can also place image rectangles in Artwork yourself. Older <code>_Images</code> storage still works; it becomes visible Artwork storage when reused for an upload.</p>
               <ul>
                 <li><strong>Exact name:</strong> <code>dragon.png</code>. Names are case-sensitive and include the extension.</li>
                 <li><strong>Duplicate names:</strong> use a path, such as <code>Artwork/creatures/dragon.png</code>. Make the path unique.</li>
-                <li><strong>Missing or ambiguous image:</strong> fix the name or path, then choose <strong>Refresh matches</strong>. Apply stays blocked until the errors are resolved.</li>
+                <li><strong>Missing or ambiguous image:</strong> fix the Artwork name or path in Penpot, then choose <strong>Check again</strong>. To change an image name in a connected sheet, cancel the review, edit the sheet, and use <strong>Pull Latest</strong>. Apply stays blocked until the errors are resolved.</li>
                 <li><strong>Replace an image:</strong> replace the fill on the same Artwork rectangle, then generate cards again in Export. Its current image is used.</li>
               </ul>
               <p><strong>Batch limit:</strong> 100 images totaling 32 MiB. If an upload stops partway through, successfully uploaded images remain in Artwork.</p>
@@ -384,14 +467,15 @@ Second line",dragon.png
             </section>
             <section id="help-backup" aria-labelledby="help-backup-heading">
               <h2 id="help-backup-heading">Update, export, and restore</h2>
-              <p>Update your spreadsheet, keep the same IDs, and upload a new CSV. <strong>Apply replaces the whole list</strong>: cards absent from the new file are removed from the list.</p>
+              <p>Update your spreadsheet, keep the same IDs, then use <strong>Pull Latest</strong> for a connected sheet or upload a new CSV for a local deck. <strong>Apply replaces the whole list</strong>: cards absent from the new file are removed from the list.</p>
+              <p>The review shows card counts and change totals. Expand <strong>Import details</strong> to see the source worksheet and read time, artwork matches, and every added, changed, or removed Card ID. Errors and the effect of Apply stay visible above the details.</p>
               <p>Existing generated boards stay in place after import. The <strong>out-of-date</strong> message means you need to generate cards again in Export.</p>
               <ul>
                 <li><strong>Export CSV:</strong> keeps your card text unchanged. Use this for backups, editing, and importing back into the plugin. Cards without IDs receive generated IDs in the export.</li>
                 <li><strong>Export for spreadsheets:</strong> also downloads a CSV, but adds a leading tab to values a spreadsheet might interpret as formulas, such as <code>+2 healing</code>. Use this as a viewing copy. The added tabs change those values, so use <strong>Export CSV</strong> for reimporting. Spreadsheet applications may handle this protection differently.</li>
-                <li><strong>Restore previous import:</strong> restore one saved snapshot of the card data, mappings, and output settings.</li>
+                <li><strong>Restore Previous State:</strong> restore one saved snapshot of card data, mappings, output settings, and the data-source connection.</li>
               </ul>
-              <p>Restore does not undo template or artwork edits and does not regenerate output. Review the restored data, then generate cards again in Export. A later import replaces the stored snapshot.</p>
+              <p>Restore does not undo template or artwork edits and does not regenerate output. Review the restored data, then generate cards again in Export. The next meaningful import or connection change replaces the one stored snapshot. An unchanged pull preserves it.</p>
             </section>
             <section id="help-output" aria-labelledby="help-output-heading">
               <h2 id="help-output-heading">Choose an output layout</h2>
@@ -438,7 +522,7 @@ Second line",dragon.png
                 <dt>Create deck says the page is not empty</dt><dd>Create the new deck on an empty page.</dd>
                 <dt>A template field is missing</dt><dd>Check its <code>#</code> name and layer type. Image fields need a rectangle with one image fill.</dd>
                 <dt>CSV Apply is disabled</dt><dd>Read the errors. Check IDs, quantities, column mapping, and exact artwork names. Then refresh the preview.</dd>
-                <dt>The deck changed after preview</dt><dd>Choose Refresh matches to get a fresh preview before applying.</dd>
+                <dt>The deck changed after preview</dt><dd>Choose Check again to review the preview before applying. If the sheet needs to be read again, cancel the review and use Pull Latest.</dd>
                 <dt>Cards do not fit the sheet</dt><dd>Choose a compatible card size or layout, or use single cards. Large and Tarot cards may not fit a three-row sheet.</dd>
                 <dt>The PDF button is missing</dt><dd>Select single fronts, a single shared back, six-up, nine-up, or Print and Play in Export and click Generate Cards first.</dd>
                 <dt>Printed cards are the wrong size</dt><dd>Check the template dimensions and print scaling. A PNG's pixel count alone does not set its physical print size; use the sheet PDF for physical page sizing.</dd>

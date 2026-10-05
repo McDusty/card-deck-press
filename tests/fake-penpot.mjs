@@ -1,4 +1,6 @@
-export function createFakePenpot({ back = false, width = 750, height = 1039 } = {}) {
+export function createFakePenpot(options = {}) {
+  const { back = false, width = 750, height = 1039, emptyPluginDataIsMissing = false } = options;
+  const missingPluginData = Object.hasOwn(options, 'missingPluginData') ? options.missingPluginData : '';
   let nextId = 0;
   const shapes = new Map();
   const messages = [];
@@ -95,7 +97,7 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
     id: 'page-1', root,
     getShapeById: id => shapes.get(id) ?? null,
     findShapes: (criteria = {}) => [...shapes.values()].filter(shape => shape !== root && Object.entries(criteria).every(([key, value]) => shape[key] === value)),
-    getPluginData: key => data.get(key) ?? '',
+    getPluginData: key => !data.has(key) || (emptyPluginDataIsMissing && data.get(key) === '') ? missingPluginData : data.get(key),
     setPluginData: (key, value) => data.set(key, value),
   };
   const api = {
@@ -107,7 +109,7 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
     createText: characters => { const text = new Shape('text'); text.characters = characters; return text; },
     uploadMediaData: async (name, data, mtype) => ({ id: name, width: 100, height: 100, mtype }),
     closePlugin: () => { closed = true; },
-    ui: { open() {}, onMessage(callback) { listener = callback; }, sendMessage(message) { messages.push(message); if(message.type === 'PAGE_CONTEXT') binding = message.data; if(message.type === 'CARDS_DATA' || message.type === 'CSV_APPLIED') rows = [...message.rowIds]; } },
+    ui: { open() {}, onMessage(callback) { listener = callback; }, sendMessage(message) { messages.push(message); if(['PAGE_CONTEXT', 'SOURCE_CONTEXT'].includes(message.type)) binding = message.data; if(message.type === 'CARDS_DATA' || message.type === 'CSV_APPLIED') rows = [...message.rowIds]; } },
   };
   function dispatch(type, data, extra = {}) {
     if(api.currentPage?.id !== binding.pageId) handlers.get('pagechange')?.();
@@ -121,6 +123,7 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
   return {
     api, page, front, root, shapes, messages, Shape, undoBlocks,
     message: dispatch,
+    restore() { dispatch('csv-status', null); return dispatch('csv-restore', messages.at(-1).data.restoreToken); },
     context: () => ({...binding}),
     rowIds: () => [...rows],
     switchPage(next) { api.currentPage = next; handlers.get('pagechange')?.(); },
@@ -130,7 +133,7 @@ export function createFakePenpot({ back = false, width = 750, height = 1039 } = 
     failSecondClone() { failCloneAt = cloneCount + 3; },
     forge(type, cardsData, extra = {}) { closed = false; dispatch('forge-cards', { type, cardsData, cutMarks: false, paper: 'a4', ...extra }); },
     output() { return page.getShapeById(page.getPluginData('front-output-current')); },
-    async exportPdf(type, cardsData, extra = {}) { dispatch('export-front-pdf', { type, cardsData, cutMarks: false, paper: 'a4', ...extra }); await new Promise(resolve => setImmediate(resolve)); },
+    async exportPdf(type, cardsData, extra = {}) { const requestId = `pdf-test-${++rowSerial}`; dispatch('export-front-pdf', { type, cardsData, cutMarks: false, paper: 'a4', ...extra }, {requestId}); await new Promise(resolve => setImmediate(resolve)); if (messages.at(-1)?.type === 'FRONT_PDF_IMAGES') dispatch('pdf-finish', null, {requestId}); },
     backOutput() { return page.getShapeById(page.getPluginData('back-output-current')); },
     createDeck(orientation = 'portrait') {
       for (const child of [...root.children]) child.remove();

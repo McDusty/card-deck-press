@@ -2,7 +2,7 @@
   "name": "Card Deck Press",
   "version": 2,
   "code": "plugin.js",
-  "description": "Create card decks from Penpot templates and CSV, with flexible print layouts.",
+  "description": "Create card decks from Penpot templates, CSV, or Google Sheets, with flexible print layouts.",
   "icon": "images/card-deck-press.svg",
   "permissions": [
     "content:read",
