@@ -1,8 +1,10 @@
-# Card Forge Upgraded
+# Card Deck Press
 
-**Card Forge Upgraded** is a fork of [Cardforge](https://github.com/PIWEEK/cardforge) for [Penpot](https://penpot.app/). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
+*Design cards. Build decks. Print and play.*
 
-Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. Look for **Card Forge Upgraded** in Penpot's plugin menu.
+**Card Deck Press** is a [Penpot](https://penpot.app/) plugin for designing and producing card decks, built from the original [Cardforge](https://github.com/PIWEEK/cardforge). It improves the interface and deck-building workflow, and adds spreadsheet-driven decks, reusable artwork, corrected card sizes, and more printing options. Penpot remains the design editor.
+
+Design a Front and shared Back template, add card details manually or from CSV, then generate individual cards or printable sheets. Look for **Card Deck Press** in Penpot's plugin menu.
 
 ## Install in Penpot
 
@@ -17,13 +19,13 @@ https://mcdusty.github.io/card-forge-upgraded/manifest.json
 ```
 
 4. Complete installation and approve the requested permissions: read and write document content, and allow downloads for PDF exports.
-5. Launch **Card Forge Upgraded** from the plugin manager. Start on an empty page if you are creating a new deck.
+5. Launch **Card Deck Press** from the plugin manager. Start on an empty page if you are creating a new deck.
 
-Use the **manifest URL** above, rather than the GitHub repository URL or the website's home page. This URL installs the updated fork; the original Cardforge deployment is a different installation.
+Use the **manifest URL** above, rather than the GitHub repository URL or the website's home page. This URL installs Card Deck Press; the original Cardforge deployment is a different installation.
 
 If you previously installed the localhost version, install this hosted URL and launch that entry. The hosted plugin continues working when your local server is stopped. Close and reopen it to load a newly deployed build; permission changes may require reinstalling it.
 
-If the hosted entry still shows the old **Cardforge** name, reinstall it from the same manifest URL to refresh its saved name and icon. Original or older localhost installations may still appear separately as Cardforge.
+Previously named **Card Forge Upgraded**. If Penpot still shows **Card Forge Upgraded** or **Cardforge**, remove that hosted entry and install it again from the same manifest URL to refresh its saved name and icon. Your deck data stays in the Penpot document. Original or older localhost installations may appear separately.
 
 See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot). To work on the code, use the separate [local development setup](#develop-locally) below.
 
@@ -165,7 +167,7 @@ From this repository, or the parent Penpot project folder:
 tilt up
 ```
 
-Tilt installs locked dependencies, checks types, builds the plugin, and serves it at **http://localhost:4400/**. Its dashboard is at **http://localhost:10350**. Wait for the **cardforge** service to show ready.
+Tilt installs locked dependencies, checks types, builds the plugin, and serves it at **http://localhost:4400/**. Its dashboard is at **http://localhost:10350**. Wait for the **card-deck-press** service to show ready.
 
 In Penpot on the same computer, open the plugin manager, choose **Load from URL**, and use:
 
@@ -208,4 +210,4 @@ Live Google Sheets synchronization, PNG ZIP downloads, text-overflow validation,
 
 This fork builds on [PIWEEK/Cardforge](https://github.com/PIWEEK/cardforge). The original project's credit and MIT license are preserved in [LICENSE](LICENSE).
 
-Report bugs and suggest improvements in [Card Forge Upgraded issues](https://github.com/McDusty/card-forge-upgraded/issues).
+Report bugs and suggest improvements in [Card Deck Press issues](https://github.com/McDusty/card-forge-upgraded/issues).

@@ -14,7 +14,7 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   let source = '', revision = 0, preview: ImportPreview | null = null;
   let mapping: ColumnMapping | undefined;
   let uploading = false;
-  let exportFilename = 'cardforge-deck.csv';
+  let exportFilename = 'card-deck-press-deck.csv';
   const input = element<HTMLInputElement>('csv-file');
   const artworkInput = element<HTMLInputElement>('artwork-files');
   const apply = element<HTMLButtonElement>('csv-apply');
@@ -89,10 +89,10 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   apply.addEventListener('click', () => { if (preview && !preview.errors.length) { apply.disabled = true; element('csv-summary').textContent = 'Applying import…'; setBusy(element('csv-summary'), true); hooks.send('csv-apply', preview.token); } });
   element('csv-cancel').addEventListener('click', close);
   element('csv-refresh').addEventListener('click', requestPreview);
-  element('csv-export').addEventListener('click', () => { setBusy(element('csv-export'), true); exportFilename = 'cardforge-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
-  element('csv-export-safe').addEventListener('click', () => { setBusy(element('csv-export-safe'), true); exportFilename = 'cardforge-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
+  element('csv-export').addEventListener('click', () => { setBusy(element('csv-export'), true); exportFilename = 'card-deck-press-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
+  element('csv-export-safe').addEventListener('click', () => { setBusy(element('csv-export-safe'), true); exportFilename = 'card-deck-press-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
   element('csv-restore').addEventListener('click', () => { setBusy(element('csv-restore'), true); hooks.send('csv-restore', null); });
-  element('csv-sample').addEventListener('click', () => download('card_id,quantity,name\r\n001,1,Joker\r\n002,2,Queen\r\n', 'cardforge-sample.csv'));
+  element('csv-sample').addEventListener('click', () => download('card_id,quantity,name\r\n001,1,Joker\r\n002,2,Queen\r\n', 'card-deck-press-sample.csv'));
   element('csv-add-artwork').addEventListener('click', () => { artworkInput.value = ''; artworkInput.click(); });
   artworkInput.addEventListener('change', async () => {
     const files = [...artworkInput.files ?? []]; if (!files.length) return;

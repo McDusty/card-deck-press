@@ -75,7 +75,7 @@ export function parseCsv(source: string): CsvTable {
 export function writeCsv(headers: readonly string[], rows: readonly (readonly string[])[], spreadsheetSafe = false): string {
   const encode = (value: string) => /[",\r\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
   const spreadsheetText = (value: string) => {
-    // Spreadsheet exports are for viewing, not lossless Cardforge reimports.
+    // Spreadsheet exports are for viewing, not lossless Card Deck Press reimports.
     // A leading tab inside quotes keeps Excel from evaluating formula text.
     if (spreadsheetSafe && /^[\s\uFEFF]*[=+\-@＝＋－＠]|^[\t\r\n]/u.test(value)) return `"\t${value.replace(/"/g, '""')}"`;
     return encode(value);

@@ -1,4 +1,4 @@
-# Cardforge Improvements Product Requirements Draft
+# Card Deck Press Product Requirements Draft
 
 **Status:** Draft for review, revised after adversarial review. **Date:** October 1, 2026.
 
@@ -36,7 +36,7 @@ A new card-design application, a Cider fork, a game simulator, AI artwork genera
 
 ## Main user workflow
 
-1. Create or select a Cardforge deck in Penpot.
+1. Create or select a Card Deck Press deck in Penpot.
 2. Design the front template and name its variable layers, such as `#name` and `#rules`.
 3. Add artwork to Penpot and give assets recognizable names.
 4. Import a CSV and review its column mapping, card counts, and artwork matches.

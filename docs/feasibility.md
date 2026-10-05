@@ -1,4 +1,4 @@
-# Cardforge Feasibility Checks
+# Card Deck Press Feasibility Checks
 
 **Status:** Started. **Date:** October 1, 2026.
 

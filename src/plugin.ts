@@ -47,7 +47,7 @@ penpot.on('themechange', theme => sendUi({ type: 'THEME_CHANGED', data: theme })
 let front: Board;
 let back: Board;
 
-penpot.ui.open("Card Forge Upgraded", "", {
+penpot.ui.open("Card Deck Press", "", {
     width: 1200,
     height: 650,
 });
@@ -125,7 +125,7 @@ async function createDeck(message: DeckEvent) {
     if (penpot.currentPage) {
         const { width, height } = resolveDeckSize(message.size, message.orientation, message.data);
         const context = { ...deckSession.context };
-        const media = await penpot.uploadMediaData('Card Forge image placeholder.png', templatePlaceholder, 'image/png');
+        const media = await penpot.uploadMediaData('Card Deck Press image placeholder.png', templatePlaceholder, 'image/png');
         if (!deckSession.matches(context)) throw new Error('The page changed. Return to an empty page and create the deck again.');
         const pageRoot = penpot.currentPage.root;
         if ('children' in pageRoot && pageRoot.children.length) throw new Error('The page must still be empty to create a deck.');

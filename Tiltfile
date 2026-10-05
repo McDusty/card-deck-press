@@ -2,21 +2,21 @@
 plugin_dir = os.path.dirname(__file__)
 
 local_resource(
-    'cardforge-deps',
+    'card-deck-press-deps',
     cmd=['npm', 'ci'],
     dir=plugin_dir,
     deps=[os.path.join(plugin_dir, path) for path in ['package.json', 'package-lock.json']],
-    labels=['cardforge'],
+    labels=['card-deck-press'],
 )
 
 # Tilt owns file watching and rebuilds. Use a plain preview, not another watcher.
 local_resource(
-    'cardforge',
+    'card-deck-press',
     cmd=['npm', 'run', 'build'],
     serve_cmd=['npm', 'exec', '--', 'vite', 'preview'],
     dir=plugin_dir,
     serve_dir=plugin_dir,
-    resource_deps=['cardforge-deps'],
+    resource_deps=['card-deck-press-deps'],
     deps=[os.path.join(plugin_dir, path) for path in [
         'src',
         'public',
@@ -35,5 +35,5 @@ local_resource(
         link('http://localhost:4400/manifest.json', 'Install in Penpot'),
         link('http://localhost:4400/', 'Plugin preview'),
     ],
-    labels=['cardforge'],
+    labels=['card-deck-press'],
 )
