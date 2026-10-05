@@ -129,12 +129,12 @@ function initMessageListener() {
       showForgeError(event.data.data);
     } else if (event.data.type === 'OUTPUT_READY') {
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
-      setPdfStatus('Cards generated. Choose a six-up or nine-up sheet layout to download a multi-page PDF.');
+      setPdfStatus('Cards generated. Choose single cards, six-up, nine-up, or Print and Play to download a multi-page PDF.');
     } else if (event.data.type === 'FRONT_OUTPUT_READY') {
       pdfReady = true;
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
       document.getElementById('download-pdf')?.classList.remove('hidden');
-      setPdfStatus(`Generated ${event.data.data.sheets} ${event.data.data.sheets === 1 ? 'sheet' : 'sheets'}. Download the PDF and print at Actual Size (100%).`);
+      setPdfStatus(`Generated ${event.data.data.sheets} ${event.data.data.sheets === 1 ? 'page' : 'pages'}. Download the PDF and print at Actual Size (100%).`);
     } else if (event.data.type === 'PDF_EXPORT_PROGRESS') {
       if (pdfOperation?.id !== message.requestId) return;
       setPdfStatus(`Preparing sheet ${event.data.data.current} of ${event.data.data.total}…`);
@@ -146,7 +146,7 @@ function initMessageListener() {
       showForgeError(event.data.data);
     } else if (event.data.type === 'OUTPUT_SETTINGS') {
       const settings = event.data.data;
-      if (settings && typeof settings.type === 'string' && isFaceMode(settings.type)) {
+      if (settings && typeof settings.type === 'string' && (isFaceMode(settings.type) || ['standard', 'printplay', 'tabletop'].includes(settings.type))) {
         (document.getElementById('forge-type') as HTMLSelectElement).value = settings.type;
         if (settings.paper === 'a4' || settings.paper === 'letter') {
           (document.getElementById('forge-paper') as HTMLSelectElement).value = settings.paper;
@@ -560,7 +560,7 @@ function requestPdf() {
   } });
 }
 
-async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 'a4'; deckName: string; layout: string }, operation: NonNullable<typeof pdfOperation>) {
+async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 'a4'; deckName: string; layout: string; landscape?: boolean; pageSize?: [number, number] }, operation: NonNullable<typeof pdfOperation>) {
   let url: string | undefined;
   try {
     const assertCurrent = () => {
@@ -568,7 +568,7 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
     };
     assertCurrent();
     const images = data.pages.map(page => page instanceof Uint8Array ? page : new Uint8Array(page));
-    const bytes = await createSheetPdf(images, data.paper, { assertCurrent });
+    const bytes = await createSheetPdf(images, data.paper, { assertCurrent, landscape: data.landscape, pageSize: data.pageSize });
     assertCurrent();
     if (bytes.byteLength > 256 * 1024 * 1024) throw new Error('The PDF exceeds the 256 MiB download limit.');
     url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));

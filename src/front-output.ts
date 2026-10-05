@@ -2,7 +2,7 @@ import type { Board, Page, Penpot, Shape } from '@penpot/plugin-types';
 import type { CardRecord, FaceMode, PaperSize } from './output-options';
 import { calculateFrontLayout, PAGE_GAP } from './front-layout';
 import { calculateCutLines } from './cut-lines';
-import { isSheetMode, parseForgeRequest } from './output-options';
+import { isFaceMode, isSheetMode, parseForgeRequest } from './output-options';
 import { cloneTracked } from './output-clone';
 import { readDeck } from './csv-import';
 
@@ -23,7 +23,7 @@ function descendants(shape: Shape): Shape[] {
   return [shape, ...('children' in shape ? shape.children.flatMap(descendants) : [])];
 }
 
-function templateSignature(front: Board): string {
+export function templateSignature(front: Board): string {
   return JSON.stringify(descendants(front).map(shape => ({
     id: shape.id, type: shape.type, name: shape.name, x: shape.x, y: shape.y,
     width: shape.width, height: shape.height, rotation: shape.rotation,
@@ -179,19 +179,25 @@ function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceM
 
 export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: () => boolean = () => true,
   progress: (data: { current: number; total: number }) => void = data => api.ui.sendMessage({ type: 'PDF_EXPORT_PROGRESS', data })):
-  Promise<{ pages: Uint8Array[]; paper: PaperSize; deckName: string; layout: string }> {
+  Promise<{ pages: Uint8Array[]; paper: PaperSize; deckName: string; layout: string; landscape: boolean; pageSize?: [number, number] }> {
   const request = parseForgeRequest(value);
-  if (!isSheetMode(request.type)) throw new Error('Choose a six- or nine-card sheet layout.');
+  const foldOver = request.type === 'printplay';
+  if (!isFaceMode(request.type) && !foldOver) throw new Error('Choose single cards, six-up, nine-up, or Print and Play.');
   const page = api.currentPage;
   if (!page) throw new Error('Open the deck page first.');
   if (page.getPluginData('cardsData') && JSON.stringify(readDeck(page)) !== JSON.stringify(request.cardsData)) {
     throw new Error('The deck changed. Forge again before downloading.');
   }
   const backOnly = request.type.startsWith('backs-');
-  const currentKey = backOnly ? 'back-output-current' : CURRENT_KEY;
+  const currentKey = foldOver ? 'legacy-output-current' : backOnly ? 'back-output-current' : CURRENT_KEY;
   const front = getFrontTemplate(page, backOnly ? 'Back' : 'Front');
-  const output = ownedCompleteOutput(page, page.getPluginData(currentKey), `${page.id}:${front.id}`);
-  if (!output || output.getPluginData(REQUEST_KEY) !== JSON.stringify(request) || output.getPluginData(TEMPLATE_KEY) !== templateSignature(front)) {
+  const signature = () => foldOver ? JSON.stringify([templateSignature(front), templateSignature(getFrontTemplate(page, 'Back'))]) : templateSignature(front);
+  const candidateId = page.getPluginData(currentKey);
+  const candidate = candidateId ? page.getShapeById(candidateId) : null;
+  const output = foldOver ? candidate?.type === 'board' && candidate.getPluginData('cardforge-legacy-state') === 'complete' &&
+    candidate.getPluginData('cardforge-legacy-owner') === `${page.id}:${front.id}:${getFrontTemplate(page, 'Back').id}` ? candidate : null
+    : ownedCompleteOutput(page, page.getPluginData(currentKey), `${page.id}:${front.id}`);
+  if (!output || output.getPluginData(REQUEST_KEY) !== JSON.stringify(request) || output.getPluginData(TEMPLATE_KEY) !== signature()) {
     throw new Error('The deck or settings changed. Forge again before downloading.');
   }
   const sheets = output.children;
@@ -206,7 +212,7 @@ export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: 
     try {
       const data = await sheet.export({ type: 'png', scale: 1 });
       if (!isCurrent() || api.currentPage?.id !== page.id || page.getPluginData(currentKey) !== output.id ||
-          output.getPluginData(TEMPLATE_KEY) !== templateSignature(front) || page.getPluginData('cardsData') !== savedCards ||
+          output.getPluginData(TEMPLATE_KEY) !== signature() || page.getPluginData('cardsData') !== savedCards ||
           page.getPluginData('csv-import-metadata') !== metadata || page.getPluginData('outputSettings') !== settings ||
           page.getPluginData('csv-output-stale') !== stale) {
         throw new Error('The deck changed during export. Forge again before downloading.');
@@ -219,5 +225,7 @@ export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: 
       throw new Error(`Sheet ${index + 1}: ${error instanceof Error ? error.message : 'Rendering failed. Try downloading again.'}`);
     }
   }
-  return { pages, paper: request.paper, deckName: page.name, layout: request.type };
+  return { pages, paper: foldOver ? 'a4' : request.paper, deckName: page.name, layout: request.type,
+    landscape: foldOver && sheets[0].width > sheets[0].height,
+    pageSize: !foldOver && !isSheetMode(request.type) ? [front.width * 72 / 300, front.height * 72 / 300] : undefined };
 }

@@ -397,7 +397,7 @@ Second line",dragon.png
             <section id="help-output" aria-labelledby="help-output-heading">
               <h2 id="help-output-heading">Choose an output layout</h2>
               <p>Open <strong>Export → Output Layout</strong> to choose what to generate.</p>
-              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Sheet layouts offer <strong>Download PDF</strong> once generation succeeds. For single cards, export the generated boards using Penpot.</p>
+              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Single-card, six-up, nine-up, and Print and Play layouts offer <strong>Download PDF</strong> once generation succeeds. Standard and Tabletop boards can be exported through Penpot.</p>
               <p>Switching tabs keeps your output settings and a ready PDF. Editing cards, importing data, or changing output settings requires generating the output again. Use <strong>Back to Edit Deck</strong> or the top tab to return to your cards.</p>
               <div class="help-table-wrap">
                 <table>
@@ -426,7 +426,7 @@ Second line",dragon.png
                 <li><strong>Cut lines:</strong> default to Yes for sheets. Each shared card edge gets one straight line. Switch them off if you prefer.</li>
                 <li><strong>Card size:</strong> cards keep the template dimensions. If the selected grid does not fit, choose another size or layout.</li>
               </ul>
-              <p>After generating a sheet in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains the sheets in order, on physically sized Letter or A4 pages.</p>
+              <p>After generation in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains generated pages in order. Single-card pages use the template's physical print size. Six-up and nine-up sheets use Letter or A4; Print and Play uses A4 in the generated orientation.</p>
               <p>Print the PDF at <strong>Actual Size / 100%</strong>. Turn off Fit to Page. Measure a test card before printing the whole deck.</p>
               <p>Editing cards while a PDF is being prepared cancels that download. Generate cards again to download the updated deck. Sheets are processed one at a time to reduce memory use. Very large files are stopped with a size error; reduce quantities or export a smaller selection of cards.</p>
               <p>PDF sheets contain 300-ppi images. For single-card images, use Penpot's export controls. Automatic PNG ZIP downloads are not available yet.</p>
@@ -441,7 +441,7 @@ Second line",dragon.png
                 <dt>CSV Apply is disabled</dt><dd>Read the errors. Check IDs, quantities, column mapping, and exact artwork names. Then refresh the preview.</dd>
                 <dt>The deck changed after preview</dt><dd>Choose Refresh matches to get a fresh preview before applying.</dd>
                 <dt>Cards do not fit the sheet</dt><dd>Choose a compatible card size or layout, or use single cards. Large and Tarot cards may not fit a three-row sheet.</dd>
-                <dt>The PDF button is missing</dt><dd>Select a six-up or nine-up sheet layout in Export and click Generate Cards first.</dd>
+                <dt>The PDF button is missing</dt><dd>Select single fronts, a single shared back, six-up, nine-up, or Print and Play in Export and click Generate Cards first.</dd>
                 <dt>Printed cards are the wrong size</dt><dd>Check the template dimensions and print scaling. A PNG's pixel count alone does not set its physical print size; use the sheet PDF for physical page sizing.</dd>
                 <dt>Changes do not show in output</dt><dd>Generate cards again in Export after editing card data, the template, or artwork. Reopen the plugin after a local plugin rebuild.</dd>
               </dl>

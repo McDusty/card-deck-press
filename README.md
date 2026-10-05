@@ -59,7 +59,7 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front's **inside** frame starts with a `#title` text layer and a black `#image` image placeholder. Back also has a black image placeholder inside its **inside** frame for your shared back design.
 2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
 3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
-4. Open **Export**, select a layout, and click **Generate Cards**. Six-up and nine-up sheets offer **Download PDF**. Export individual boards through Penpot.
+4. Open **Export**, select a layout, and click **Generate Cards**. Single-card, six-up, nine-up, and fold-over layouts offer **Download PDF**. Export individual boards through Penpot.
 
 The **Back** is a shared design and does not support variable fields. The in-plugin **Help** tab contains the full workflow.
 
@@ -145,7 +145,7 @@ Cards retain their template dimensions. A layout that cannot fit reports an erro
 
 Fronts and backs have separate output containers. Generating one preserves the other. Only recorded plugin-owned output is replaced; unrelated or older unclaimed Output frames are preserved.
 
-**Download PDF** is available for six-up and nine-up front or back sheets after generation. PDFs contain 300-ppi raster sheet images on exact Letter or A4 pages. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
+**Download PDF** is available after generating single fronts, a single shared back, six-up or nine-up sheets, or Print and Play fold-over pages. Single-card PDFs use one page per generated card at its template print size. Sheet PDFs use exact Letter or A4 pages; fold-over pages use A4 in the generated orientation. All PDFs contain 300-ppi raster images. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
 
 ## Automatic deployment
 

@@ -2,7 +2,7 @@
 import { resolveDeckSize } from './card-sizes';
 import { Shape, Board } from '@penpot/plugin-types';
 import type { PluginUIEvent, DeckEvent, CardField } from './model';
-import { isFaceMode, isSheetMode, parseForgeRequest } from './output-options';
+import { isFaceMode, parseForgeRequest } from './output-options';
 import { generateFrontOutput, exportFrontSheets } from './front-output';
 import { correctPokerTemplates, getTemplateSizeInfo } from './template-size';
 import { CsvImporter, validateImportedFields, readDeck, importFields } from './csv-import';
@@ -349,11 +349,12 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             if (isFaceMode(request.type)) {
                 const output = generateFrontOutput(penpot, outputCards, request.type, request.paper, request.cutMarks, request.cardsData);
                 penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
-                if (isSheetMode(request.type)) sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
-                else sendUi({ type: 'OUTPUT_READY', data: null });
+                sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
             } else {
-                forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks);
-                sendUi({ type: 'OUTPUT_READY', data: null });
+                const output = forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks, request);
+                penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
+                if (request.type === 'printplay') sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+                else sendUi({ type: 'OUTPUT_READY', data: null });
             }
             penpot.currentPage?.setPluginData('csv-output-stale', 'false');
             if (penpot.currentPage?.getPluginData('csv-import-metadata')) sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });

@@ -1,6 +1,7 @@
 import type { Penpot, Page, Shape, Board } from '@penpot/plugin-types';
 import type { CardRecord, LegacyMode } from './output-options';
-import { getFrontTemplate } from './front-output';
+import { getFrontTemplate, templateSignature } from './front-output';
+import type { ForgeRequest } from './output-options';
 import { cloneTracked } from './output-clone';
 
 const OWNER = 'cardforge-legacy-owner', STATE = 'cardforge-legacy-state';
@@ -170,7 +171,7 @@ function countRectsFit(rectA: { width: number, height: number }, rectB: { width:
     return countWidth * countHeight;
 }
 
-export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: LegacyMode, cutMarks: boolean) {
+export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: LegacyMode, cutMarks: boolean, request?: ForgeRequest) {
     console.log("start forgecards", type, cutMarks);
     const page = api.currentPage;
     if (!page) throw new Error('Open a Penpot page first.');
@@ -319,7 +320,12 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
     tmpBack?.remove();
 
     if (api.currentPage?.id !== page.id) throw new Error('The active page changed. Return to the deck and try again.');
+    if (type === 'printplay' && request) {
+      output.setPluginData('front-output-request', JSON.stringify(request));
+      output.setPluginData('front-output-template', JSON.stringify([templateSignature(frontTemplate), templateSignature(backTemplate)]));
+    }
     build.publish(output);
+    return output;
     } catch (error) { build.rollback(); throw error; }
     finally { api.history.undoBlockFinish(undo); }
 }
