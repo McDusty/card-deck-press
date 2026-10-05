@@ -48,7 +48,7 @@ let front: Board;
 let back: Board;
 
 penpot.ui.open("Card Deck Press", "", {
-    width: 1200,
+    width: 840,
     height: 650,
 });
 
