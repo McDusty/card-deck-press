@@ -173,6 +173,25 @@ Network boundary requirements:
 
 Run the transport spike against a disposable shared worksheet. Record the chosen route, fidelity checks, and actual browser results in this document. No full feature work until this gate passes.
 
+#### Transport evidence — October 5, 2026
+
+**Local access check passed; the complete release gate remains open.** Tested the user's shared test workbook without changing its cells or the Penpot deck. The workbook link and exported card data were held only in temporary local files, not committed to this repository.
+
+| Check | Observed result |
+| --- | --- |
+| Anonymous export | `/spreadsheets/d/{id}/export?format=csv&gid={gid}` returned CSV without cookies or Google sign-in |
+| Google redirect | Initial response was HTTP 307 to `doc-0s-7g-sheets.googleusercontent.com`; final response HTTP 200, text/csv |
+| Browser access | Explicit credentials:omit and cache:no-store succeeded from localhost and from the local test plugin iframe inside the user's HTTPS Penpot deployment |
+| Browser origin policy | Initial response allowed the localhost origin; final response allowed any origin. Blocking redirects caused fetch to fail, so this route requires the documented Google-managed follow policy |
+| Main worksheet | 54 records, 16 columns, 11,476 response bytes; all parsed headers and cells matched a separately downloaded anonymous CSV baseline |
+| Nonfirst worksheet | The selected spade tab returned 13 records, 14 columns, 2,465 bytes; all headers and cells matched its own anonymous baseline |
+| Invalid worksheet | An invented gid returned HTTP 400 in both anonymous HTTP and the Penpot iframe test; it did not fall back to another tab |
+| Normal link without gid | Google opened the workbook at a specific tab in its editor. This supplied link itself omitted gid; production setup still needs the selected worksheet address, as described in §2 |
+| Import compatibility | The main tab's Card column can be explicitly mapped to Card ID; the spade tab already includes card_id and quantity. Template and Artwork mapping were not applied during the transport test |
+| Cleanup | Temporary zero-permission test plugin was removed after testing. No production plugin code was changed |
+
+This proves anonymous local browser access and explicit tab selection for this workbook. Comparison against Google's anonymous CSV export does not independently prove original cell-format fidelity. Still required: controlled formatting fixtures (`001`, minority mixed-type cells, multiline/quoted/formula results and invalid headers), viewer download restrictions/revocation, repeat-read freshness, cancellation/stream limits, and an isolated HTTPS-hosted reader check. Do not label the entire Milestone 0 gate complete from these results alone.
+
 ### Milestone 1 — Source model and transactions
 
 - Add `src/deck-source.ts`: typed persisted source, runtime validation, canonical link parser, read/write helpers, source authority checks. Extend `src/deck-session.ts` with the non-restorable operation/source epoch.
