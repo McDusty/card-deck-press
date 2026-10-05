@@ -1,14 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Alegreya:ital,wght@0,400..900;1,400..900&display=swap"
-    rel="stylesheet">
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@200..700&display=swap" rel="stylesheet">
   <title>Card Forge Upgraded</title>
 </head>
 
@@ -19,10 +14,10 @@
       <span class="brand-name">Card Forge Upgraded</span>
     </div>
     <div class="tabs" role="tablist" aria-label="Deck workflow">
-      <button id="ts-create" data-tab="create" class="tab-selector current" type="button" role="tab" aria-controls="tab-create" aria-selected="true">CREATE DECK</button>
-      <button id="ts-cards" data-tab="cards" class="tab-selector" type="button" role="tab" aria-controls="tab-cards" aria-selected="false" tabindex="-1">EDIT DECK</button>
-      <button id="ts-export" data-tab="export" class="tab-selector" type="button" role="tab" aria-controls="tab-export" aria-selected="false" tabindex="-1">EXPORT</button>
-      <button id="ts-help" data-tab="help" class="tab-selector" type="button" role="tab" aria-controls="tab-help" aria-selected="false" tabindex="-1">HELP</button>
+      <button id="ts-create" data-tab="create" class="tab-selector current" type="button" role="tab" aria-controls="tab-create" aria-selected="true">Create Deck</button>
+      <button id="ts-cards" data-tab="cards" class="tab-selector" type="button" role="tab" aria-controls="tab-cards" aria-selected="false" tabindex="-1">Edit Deck</button>
+      <button id="ts-export" data-tab="export" class="tab-selector" type="button" role="tab" aria-controls="tab-export" aria-selected="false" tabindex="-1">Export</button>
+      <button id="ts-help" data-tab="help" class="tab-selector" type="button" role="tab" aria-controls="tab-help" aria-selected="false" tabindex="-1">Help</button>
     </div>
   </div>
   <div id="content">
@@ -45,16 +40,16 @@
         </div>
 
         <form id="create-deck-frm">
-          <div class="input-text"><label for="create-deck-name">DECK NAME</label><input id="create-deck-name" type="text" required="required"
+          <div class="input-text"><label for="create-deck-name">Deck name</label><input id="create-deck-name" type="text" required="required"
               value="Deck01" />
           </div>
           <div class="row-input">
             <div class="input-text">
-              <label for="create-deck-size">CARD SIZE</label>
+              <label for="create-deck-size">Card size</label>
               <select id="create-deck-size">
               </select>
             </div>
-            <div class="input-text"><label for="create-deck-orientation">DECK ORIENTATION</label>
+            <div class="input-text"><label for="create-deck-orientation">Orientation</label>
               <select id="create-deck-orientation">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
@@ -62,7 +57,7 @@
             </div>
           </div>
           <div class="row-input">
-            <div class="input-text"><label for="create-deck-units">MEASUREMENTS</label>
+            <div class="input-text"><label for="create-deck-units">Measurements</label>
               <select id="create-deck-units"><option value="px">Pixels (px)</option><option value="inch">Inches</option><option value="mm">Millimeters (mm)</option></select>
             </div>
           </div>
@@ -73,7 +68,7 @@
           <p id="create-size-note" role="status"></p>
           <p id="create-size-error" class="hidden" role="alert"></p>
           <div class="modal-buttons">
-            <button class="btn-primary" type="submit">CREATE DECK</button>
+            <button class="btn-primary" type="submit">Create Deck</button>
           </div>
         </form>
       </div>
@@ -111,10 +106,10 @@
     <div id="tab-cards" class="tab" role="tabpanel" aria-labelledby="ts-cards">
       <div id="cards-container">
         <div id="forge-entry" class="forge-entry" role="group" aria-label="Card actions">
-          <button id="upload-csv" class="btn-primary" type="button">IMPORT CSV</button>
-          <button id="correct-poker-size" class="btn-primary hidden" type="button">CORRECT POKER SIZE</button>
+          <button id="upload-csv" class="btn-primary" type="button">Import CSV</button>
+          <button id="correct-poker-size" class="btn-primary hidden" type="button">Correct Poker Size</button>
           <button id="refresh-artwork" type="button">Refresh Artwork</button>
-          <button id="add-card" class="btn-primary" type="button">ADD CARD</button>
+          <button id="add-card" class="btn-primary" type="button">Add Card</button>
         </div>
         <div id="template-size-panel" class="template-size-panel">
           <p id="template-size" role="status">Poker size: 750 × 1050 px (2.5 × 3.5 inches at 300 ppi).</p>
@@ -136,8 +131,8 @@
             <h3>No cards yet</h3>
             <p>Add your first card or import a CSV to fill this deck.</p>
             <div class="cards-empty-actions">
-              <button id="empty-import-csv" class="btn-primary" type="button">IMPORT CSV</button>
-              <button id="empty-add-card" class="btn-primary" type="button">ADD CARD</button>
+              <button id="empty-import-csv" class="btn-primary" type="button">Import CSV</button>
+              <button id="empty-add-card" class="btn-primary" type="button">Add Card</button>
             </div>
           </div>
         </div>
@@ -158,7 +153,7 @@
           <button id="csv-refresh" type="button">Refresh matches</button>
         </div>
         <p id="csv-filename"></p>
-        <p>Image columns match exact image names, including extensions, in Artwork. Use Artwork/folder/image.png to resolve duplicate names.</p>
+        <p>Image columns match image names in Artwork, with or without file extensions. Exact matches take priority. Use Artwork/folder/image.png to resolve duplicate names.</p>
         <p id="csv-summary" role="status"></p>
         <p id="csv-error" class="hidden" role="alert"></p>
         <div id="csv-mapping"></div>
@@ -188,10 +183,10 @@
         </div>
 
         <form id="forge-frm">
-          <h3>EXPORT CARDS</h3>
+          <h3>Export cards</h3>
           <div class="row-input">
             <div class="input-text">
-              <label for="forge-type">OUTPUT LAYOUT</label>
+              <label for="forge-type">Output layout</label>
               <select id="forge-type">
                 <optgroup label="Fronts only — no backs">
                   <option value="fronts-single">Single fronts (no backs)</option>
@@ -210,7 +205,7 @@
                 </optgroup>
               </select>
             </div>
-            <div class="input-text"><label for="forge-cut-marks">WITH CUT LINES</label>
+            <div class="input-text"><label for="forge-cut-marks">Cut lines</label>
               <select id="forge-cut-marks">
                 <option value="false">No</option>
                 <option value="true">Yes</option>
@@ -400,7 +395,7 @@ Second line",dragon.png
             <section id="help-output" aria-labelledby="help-output-heading">
               <h2 id="help-output-heading">Choose an output layout</h2>
               <p>Open <strong>Export → Output Layout</strong> to choose what to generate.</p>
-              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Sheet layouts offer <strong>Download PDF</strong> once generation succeeds. For single cards, export the generated boards using Penpot.</p>
+              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Single-card, six-up, nine-up, and Print and Play layouts offer <strong>Download PDF</strong> once generation succeeds. Standard and Tabletop boards can be exported through Penpot.</p>
               <p>Switching tabs keeps your output settings and a ready PDF. Editing cards, importing data, or changing output settings requires generating the output again. Use <strong>Back to Edit Deck</strong> or the top tab to return to your cards.</p>
               <div class="help-table-wrap">
                 <table>
@@ -429,7 +424,7 @@ Second line",dragon.png
                 <li><strong>Cut lines:</strong> default to Yes for sheets. Each shared card edge gets one straight line. Switch them off if you prefer.</li>
                 <li><strong>Card size:</strong> cards keep the template dimensions. If the selected grid does not fit, choose another size or layout.</li>
               </ul>
-              <p>After generating a sheet in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains the sheets in order, on physically sized Letter or A4 pages.</p>
+              <p>After generation in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains generated pages in order. Single-card pages use the template's physical print size. Six-up and nine-up sheets use Letter or A4; Print and Play uses A4 in the generated orientation.</p>
               <p>Print the PDF at <strong>Actual Size / 100%</strong>. Turn off Fit to Page. Measure a test card before printing the whole deck.</p>
               <p>Editing cards while a PDF is being prepared cancels that download. Generate cards again to download the updated deck. Sheets are processed one at a time to reduce memory use. Very large files are stopped with a size error; reduce quantities or export a smaller selection of cards.</p>
               <p>PDF sheets contain 300-ppi images. For single-card images, use Penpot's export controls. Automatic PNG ZIP downloads are not available yet.</p>
@@ -444,7 +439,7 @@ Second line",dragon.png
                 <dt>CSV Apply is disabled</dt><dd>Read the errors. Check IDs, quantities, column mapping, and exact artwork names. Then refresh the preview.</dd>
                 <dt>The deck changed after preview</dt><dd>Choose Refresh matches to get a fresh preview before applying.</dd>
                 <dt>Cards do not fit the sheet</dt><dd>Choose a compatible card size or layout, or use single cards. Large and Tarot cards may not fit a three-row sheet.</dd>
-                <dt>The PDF button is missing</dt><dd>Select a six-up or nine-up sheet layout in Export and click Generate Cards first.</dd>
+                <dt>The PDF button is missing</dt><dd>Select single fronts, a single shared back, six-up, nine-up, or Print and Play in Export and click Generate Cards first.</dd>
                 <dt>Printed cards are the wrong size</dt><dd>Check the template dimensions and print scaling. A PNG's pixel count alone does not set its physical print size; use the sheet PDF for physical page sizing.</dd>
                 <dt>Changes do not show in output</dt><dd>Generate cards again in Export after editing card data, the template, or artwork. Reopen the plugin after a local plugin rebuild.</dd>
               </dl>

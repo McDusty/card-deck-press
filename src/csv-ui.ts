@@ -1,6 +1,7 @@
 import { CSV_MAX_BYTES } from './csv';
 import type { ImportPreview, ColumnMapping } from './csv-import';
 import type { CardRecord } from './output-options';
+import { setBusy } from './busy-ui';
 
 interface Hooks {
   send(type: string, data: unknown): void;
@@ -18,6 +19,7 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   const artworkInput = element<HTMLInputElement>('artwork-files');
   const apply = element<HTMLButtonElement>('csv-apply');
   function error(message: string) {
+    if (message) setBusy(element('csv-summary'), false);
     element('csv-error').textContent = message;
     element('csv-error').classList.toggle('hidden', !message);
   }
@@ -25,6 +27,7 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
     if (!source || uploading) return;
     apply.disabled = true; preview = null; revision++;
     error(''); element('csv-summary').textContent = 'Checking CSV and artwork…';
+    setBusy(element('csv-summary'), true);
     hooks.send('csv-preview', { source, mapping, revision });
   }
   function close() {
@@ -39,6 +42,7 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
   function display(data: ImportPreview) {
     if (data.revision !== revision) return;
     preview = data; mapping = data.mapping;
+    setBusy(element('csv-summary'), false);
     element('csv-summary').textContent = `${data.records} card records · ${data.copies} printed copies · ${data.artworkMatches} artwork matches.\n${data.added} added · ${data.changed} changed · ${data.removed} removed. Apply replaces the current card list.`;
     const container = element('csv-mapping'); container.replaceChildren();
     for (const header of data.headers) {
@@ -72,20 +76,22 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
     element('csv-panel').classList.remove('hidden'); element('cards-container').classList.add('hidden');
     element('csv-filename').textContent = file.name; element('csv-preview-table').replaceChildren(); element('csv-mapping').replaceChildren();
     source = ''; preview = null; mapping = undefined; revision++; const fileRevision = revision; apply.disabled = true;
+    error(''); element('csv-summary').textContent = 'Reading CSV…'; setBusy(element('csv-summary'), true);
     try {
       if (file.size > CSV_MAX_BYTES) throw new Error('Choose a CSV smaller than 2 MiB.');
       const bytes = await file.arrayBuffer();
       if (revision !== fileRevision) return;
       source = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+      if (!source) throw new Error('The CSV is empty. Include a header row and at least one card.');
       requestPreview();
     } catch (issue) { error(issue instanceof Error ? issue.message : 'Save the spreadsheet as UTF-8 CSV and try again.'); }
   });
-  apply.addEventListener('click', () => { if (preview && !preview.errors.length) { apply.disabled = true; hooks.send('csv-apply', preview.token); } });
+  apply.addEventListener('click', () => { if (preview && !preview.errors.length) { apply.disabled = true; element('csv-summary').textContent = 'Applying import…'; setBusy(element('csv-summary'), true); hooks.send('csv-apply', preview.token); } });
   element('csv-cancel').addEventListener('click', close);
   element('csv-refresh').addEventListener('click', requestPreview);
-  element('csv-export').addEventListener('click', () => { exportFilename = 'cardforge-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
-  element('csv-export-safe').addEventListener('click', () => { exportFilename = 'cardforge-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
-  element('csv-restore').addEventListener('click', () => hooks.send('csv-restore', null));
+  element('csv-export').addEventListener('click', () => { setBusy(element('csv-export'), true); exportFilename = 'cardforge-deck.csv'; hooks.send('csv-export', { spreadsheetSafe: false }); });
+  element('csv-export-safe').addEventListener('click', () => { setBusy(element('csv-export-safe'), true); exportFilename = 'cardforge-spreadsheet.csv'; hooks.send('csv-export', { spreadsheetSafe: true }); });
+  element('csv-restore').addEventListener('click', () => { setBusy(element('csv-restore'), true); hooks.send('csv-restore', null); });
   element('csv-sample').addEventListener('click', () => download('card_id,quantity,name\r\n001,1,Joker\r\n002,2,Queen\r\n', 'cardforge-sample.csv'));
   element('csv-add-artwork').addEventListener('click', () => { artworkInput.value = ''; artworkInput.click(); });
   artworkInput.addEventListener('change', async () => {
@@ -94,11 +100,20 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
       if (files.length > 100 || files.reduce((size, file) => size + file.size, 0) > 32 * 1024 * 1024) throw new Error('Choose up to 100 images, totaling at most 32 MiB.');
       uploading = true; apply.disabled = true; error('');
       element('csv-summary').textContent = 'Uploading artwork…';
+      setBusy(element('csv-summary'), true);
       hooks.send('upload-artwork', await Promise.all(files.map(async file => ({ name: file.name, mimeType: file.type, data: new Uint8Array(await file.arrayBuffer()) }))));
     } catch (issue) { uploading = false; error(issue instanceof Error ? issue.message : 'Artwork upload failed.'); }
   });
   hooks.send('csv-status', null);
   return (type, value) => {
+    if (type === 'CSV_ERROR') {
+      const data = value as { revision?: number };
+      if (data.revision !== undefined && data.revision !== revision) return;
+    }
+    if (['CSV_RESET', 'CSV_EXPORT', 'CSV_APPLIED', 'CSV_ERROR'].includes(type)) {
+      for (const id of ['csv-export', 'csv-export-safe', 'csv-restore']) setBusy(element(id), false);
+    }
+    if (['CSV_RESET', 'CSV_APPLIED', 'CSV_ERROR'].includes(type)) setBusy(element('csv-summary'), false);
     if (type === 'CSV_RESET') { source = ''; revision++; preview = null; mapping = undefined; uploading = false; apply.disabled = true; close(); error(''); element('csv-filename').textContent = ''; element('csv-summary').textContent = ''; element('csv-mapping').replaceChildren(); element('csv-preview-table').replaceChildren(); }
     else if (type === 'CSV_PREVIEW') display(value as ImportPreview);
     else if (type === 'CSV_APPLIED') { hooks.apply(value as CardRecord[]); hooks.invalidate(); close(); }
@@ -117,6 +132,6 @@ export function initCsvUi(hooks: Hooks): (type: string, data: unknown) => void {
     } else if (type === 'ARTWORK_PROGRESS') {
       const data = value as { uploaded: number; total: number };
       element('csv-summary').textContent = `Uploading artwork ${data.uploaded} of ${data.total}…`;
-    } else if (type === 'ARTWORK_READY') { uploading = false; requestPreview(); }
+    } else if (type === 'ARTWORK_READY') { uploading = false; setBusy(element('csv-summary'), false); requestPreview(); }
   };
 }

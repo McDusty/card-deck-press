@@ -3,12 +3,14 @@ import type { PaperSize } from './output-options';
 
 const MAX_INPUT_BYTES = 256 * 1024 * 1024;
 const MAX_EMBEDDED_BYTES = 128 * 1024 * 1024;
-interface PdfOptions { assertCurrent?: () => void }
+interface PdfOptions { assertCurrent?: () => void; landscape?: boolean; pageSize?: [number, number] }
 
 export async function createSheetPdf(images: readonly Uint8Array[], paper: PaperSize, options: PdfOptions = {}): Promise<Uint8Array> {
   if (images.length === 0) throw new Error('There are no sheets to download.');
-  if (images.length > 167 || images.reduce((sum, bytes) => sum + bytes.byteLength, 0) > MAX_INPUT_BYTES) throw new Error('The PDF is too large. Export fewer cards at a time.');
-  const dimensions: [number, number] = paper === 'letter' ? [612, 792] : [210 * 72 / 25.4, 297 * 72 / 25.4];
+  if (images.length > 1000 || images.reduce((sum, bytes) => sum + bytes.byteLength, 0) > MAX_INPUT_BYTES) throw new Error('The PDF is too large. Export fewer cards at a time.');
+  const dimensions: [number, number] = options.pageSize ? [...options.pageSize] : paper === 'letter' ? [612, 792] : [210 * 72 / 25.4, 297 * 72 / 25.4];
+  if (dimensions.some(size => !Number.isFinite(size) || size <= 0 || size > 12000 * 72 / 300)) throw new Error('Invalid PDF page size.');
+  if (options.landscape) dimensions.reverse();
   const expectedWidth = Math.round(dimensions[0] / 72 * 300);
   const expectedHeight = Math.round(dimensions[1] / 72 * 300);
   const pdf = await PDFDocument.create();

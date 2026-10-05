@@ -8,6 +8,15 @@ import { fixture } from './fixture.mjs';
 const deck = count => Array.from({ length: count }, (_, i) => ({ '#name': `Card ${i + 1}` }));
 function walk(shape) { return [shape, ...(shape.children ?? []).flatMap(walk)]; }
 
+for (const mode of ['fronts-single', 'backs-single', 'standard', 'printplay', 'tabletop']) {
+  test(`${mode}: generation keeps the plugin open and reports completion`, () => {
+    const f = fixture({back:true});
+    f.forge(mode, deck(3));
+    assert.equal(f.wasClosed(), false);
+    assert.equal(f.messages.at(-1).type, ['fronts-single', 'backs-single', 'printplay'].includes(mode) ? 'FRONT_OUTPUT_READY' : 'OUTPUT_READY');
+  });
+}
+
 for (const [mode, perPage, counts] of [['fronts-6', 6, [6, 6, 6, 6, 6, 6, 6, 6, 4]], ['fronts-9', 9, [9, 9, 9, 9, 9, 7]]]) {
   test(`${mode}: 52 ordered fronts, incomplete final sheet, no Back template`, () => {
     const f = fixture();
@@ -132,8 +141,8 @@ for (const mode of ['standard', 'printplay', 'tabletop']) {
   test(`existing ${mode} layout still generates with a Back template`, () => {
     const f = fixture({ back: true });
     f.forge(mode, deck(2));
-    assert.equal(f.messages.length, 0);
-    assert.equal(f.wasClosed(), true);
+    assert.equal(f.messages.at(-1).type, mode === 'printplay' ? 'FRONT_OUTPUT_READY' : 'OUTPUT_READY');
+    assert.equal(f.wasClosed(), false);
     assert.equal(f.page.findShapes({ name: 'Output', type: 'board' }).length, 1);
   });
 }
@@ -185,7 +194,7 @@ for (const [mode, counts] of [['backs-6', [6, 6, 1]], ['backs-9', [9, 4]], ['bac
     const actual = mode === 'backs-single' ? [output.children.length] : output.children.map(sheet => sheet.children.length);
     assert.deepEqual(actual, counts);
     assert.ok(walk(output).filter(shape => shape.type === 'text').every(shape => shape.characters === 'Shared back'));
-    assert.equal(f.wasClosed(), mode === 'backs-single');
+    assert.equal(f.wasClosed(), false);
   });
 }
 
@@ -401,4 +410,41 @@ test('fractional template dimensions do not create duplicate shared cut lines', 
   const f = fixture({width:749.1234,height:1049.5678});
   f.forge('fronts-9',deck(9),{paper:'letter',cutMarks:true});
   assert.equal(f.output().children[0].children.filter(shape=>shape.name==='Cut line').length,8);
+});
+
+for (const mode of ['fronts-single', 'backs-single', 'printplay']) {
+  test(`${mode}: exports every generated page and rejects stale templates`, async () => {
+    const f = fixture({back:true});
+    const cards = deck(13);
+    f.forge(mode, cards, {paper:'letter'});
+    const output = mode === 'printplay' ? f.page.getShapeById(f.page.getPluginData('legacy-output-current')) : mode === 'backs-single' ? f.backOutput() : f.output();
+    const rendered = [];
+    output.children.forEach((sheet,index) => { sheet.export = async () => { rendered.push(index); return new Uint8Array([index]); }; });
+    f.message('export-front-pdf', {type:mode,cardsData:cards,paper:'letter',cutMarks:false});
+    await new Promise(resolve => setImmediate(resolve));
+    const result = f.messages.at(-1);
+    assert.equal(result.type,'FRONT_PDF_IMAGES');
+    assert.equal(result.data.pages.length,output.children.length);
+    assert.deepEqual(rendered,output.children.map((_,index)=>index));
+    if (mode === 'printplay') {
+      assert.equal(result.data.paper,'a4');
+      assert.equal(result.data.landscape,output.children[0].width > output.children[0].height);
+    } else {
+      assert.deepEqual(Array.from(result.data.pageSize),[750*72/300,1039*72/300]);
+    }
+    (mode === 'backs-single' ? f.page.findShapes({name:'Back',type:'board'})[0] : f.front).width += 1;
+    f.message('export-front-pdf', {type:mode,cardsData:cards,paper:'letter',cutMarks:false});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(f.messages.at(-1).type,'PDF_EXPORT_ERROR');
+  });
+}
+
+test('Print and Play export stops if the shared Back changes during rendering', async () => {
+  const f=fixture({back:true});const cards=deck(13);f.forge('printplay',cards,{paper:'a4'});
+  const output=f.page.getShapeById(f.page.getPluginData('legacy-output-current'));
+  output.children[0].export=async()=>{f.page.findShapes({name:'Back',type:'board'})[0].width+=1;return new Uint8Array([1]);};
+  f.message('export-front-pdf',{type:'printplay',cardsData:cards,paper:'a4',cutMarks:false});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(f.messages.at(-1).type,'PDF_EXPORT_ERROR');
+  assert.match(f.messages.at(-1).data,/changed/);
 });

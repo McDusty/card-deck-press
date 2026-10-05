@@ -28,7 +28,9 @@ export default defineConfig({
         this.emitFile({ type: 'asset', fileName: 'plugin.js', source: controller.outputFiles[0].text });
       },
     },
-    livePreview(),
+    // Reloading only the UI breaks Penpot's controller connection mid-operation.
+    // Reopen the plugin manually after rebuilding to refresh both together.
+    livePreview({ reload: false }),
   ],
   build: {
     target: "es2020",

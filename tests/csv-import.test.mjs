@@ -10,7 +10,7 @@ import { fixture } from './fixture.mjs';
 const folder=mkdtempSync(join(tmpdir(),'cardforge-csv-'));
 after(()=>rmSync(folder,{recursive:true,force:true}));
 await build({entryPoints:['src/csv.ts'],outfile:join(folder,'csv.mjs'),bundle:true,platform:'node',format:'esm'});
-const {parseCsv,writeCsv}=await import(pathToFileURL(join(folder,'csv.mjs')));
+const {parseCsv,writeCsv,CSV_MAX_BYTES}=await import(pathToFileURL(join(folder,'csv.mjs')));
 const preview=(f,source,mapping)=>f.message('csv-preview',{source,mapping,revision:1});
 const saved=f=>JSON.parse(JSON.parse(f.page.getPluginData('cardsData')));
 function artwork(f,name='dragon.png',parent) {
@@ -18,6 +18,25 @@ function artwork(f,name='dragon.png',parent) {
   const image=new f.Shape('rectangle');image.name=name; image.fills=[{fillImage:{id:'media-'+image.id}}];board.appendChild(image);return image;
 }
 function imageField(f) {const field=new f.Shape('rectangle');field.name='#art';field.fills=[{fillImage:{id:'placeholder'}}];f.front.appendChild(field);return field;}
+
+test('CSV preview and apply work in the controller without TextEncoder',()=>{
+ const f=fixture();const result=preview(f,'card_id,name\n001,"Queen, 火 🃏"');
+ assert.equal(result.type,'CSV_PREVIEW');assert.equal(result.data.errors.length,0);
+ f.message('csv-apply',result.data.token);
+ assert.deepEqual(saved(f),[{card_id:'001','#name':'Queen, 火 🃏',quantity:'1'}]);
+});
+
+test('CSV byte limit counts ASCII, Unicode, surrogate pairs and unpaired surrogates',()=>{
+ const header='card_id,name\n001,';
+ for(const value of ['a','é','火','🃏','\ud800','\udc00']) {
+  const bytes=new TextEncoder().encode(value).length;
+  const count=Math.floor((CSV_MAX_BYTES-header.length)/bytes);
+  const source=header+value.repeat(count)+'a'.repeat((CSV_MAX_BYTES-header.length)%bytes);
+  assert.equal(new TextEncoder().encode(source).length,CSV_MAX_BYTES);
+  assert.equal(parseCsv(source).rows.length,1);
+  assert.throws(()=>parseCsv(source+'a'),/2 MiB/);
+ }
+});
 
 test('CSV parses BOM, commas, CRLF, multiline Unicode and escaped quotes without changing IDs',()=>{
  const table=parseCsv('\uFEFFcard_id,name,rules\r\n001,"Queen, red","First line\r\nSecond ""quoted"" line: 火"\r\n');
@@ -75,6 +94,14 @@ test('missing and ambiguous image names block import; full paths resolve duplica
  result=preview(f,'card_id,name,art\n001,A,dragon.png');assert.match(result.data.errors.join('\n'),/multiple images/);
  result=preview(f,'card_id,name,art\n001,A,Artwork/alternate/dragon.png');assert.equal(result.data.errors.length,0);assert.equal(result.data.artworkMatches,1);
  f.message('csv-apply',result.data.token);f.forge('fronts-single',saved(f));assert.equal(f.output().children[0].children.find(shape=>shape.name==='#art').fills[0].fillImage.id,group.children[0].fills[0].fillImage.id);
+});
+
+test('CSV image filenames match Artwork layers with omitted extensions',()=>{
+ const f=fixture();imageField(f);const image=artwork(f,'spade-ace');
+ const result=preview(f,'card_id,art\n001,spade-ace.png');
+ assert.equal(result.data.errors.length,0);assert.equal(result.data.artworkMatches,1);
+ f.message('csv-apply',result.data.token);
+ assert.equal(saved(f)[0]['#art'].split('|')[0],image.id);
 });
 
 test('blank mapped image clears artwork while unmapped fields retain the template',()=>{

@@ -1,5 +1,10 @@
 
 import "./style.css";
+import { setBusy } from './busy-ui';
+
+// Penpot includes the initial theme in the plugin URL (including hash routes).
+const initialTheme = new URLSearchParams(location.search || location.hash.split('?')[1] || '').get('theme');
+document.documentElement.dataset.theme = initialTheme === 'dark' ? 'dark' : 'light';
 import { initDeckSizing } from './deck-sizing-ui';
 import { cardPresets, formatDimensions, toPixels } from './card-sizes';
 import { newManualCard, duplicateManualCard } from './manual-cards';
@@ -55,7 +60,15 @@ function initMessageListener() {
   window.addEventListener("message", (event) => {
     if (event.source !== parent || !event.data || typeof event.data.type !== 'string') return;
     const message = event.data;
+    if (['DECK_SIZE_ERROR', 'ERROR_DECK_CREATE_PAGE_NOT_EMPTY', 'DECK_ERROR'].includes(message.type)) setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
+    if (message.type === 'ARTWORK_LIST') setBusy(document.getElementById('refresh-artwork'), false);
+    if (['POKER_SIZE_CORRECTED', 'TEMPLATE_SIZE_ERROR', 'DECK_ERROR'].includes(message.type)) setBusy(document.getElementById('correct-poker-size'), false);
+    if (message.type === 'THEME_CHANGED') {
+      if (message.data === 'light' || message.data === 'dark') document.documentElement.dataset.theme = message.data;
+      return;
+    }
     if (message.type === 'PAGE_CONTEXT') {
+      setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
       pageBinding = { pageId: message.pageId, session: message.session };
       cardsData = []; rowIds = []; cardFields = []; artworkAssets = []; artworkCells.clear(); imageTargets.clear();
       pdfOperation = null; setPdfBusy(false); invalidateOutput();
@@ -119,11 +132,16 @@ function initMessageListener() {
       note.classList.remove('hidden');
     } else if (event.data.type === 'FORGE_ERROR') {
       showForgeError(event.data.data);
+    } else if (event.data.type === 'OUTPUT_READY') {
+      setBusy(document.getElementById('pdf-status'), false);
+      (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
+      setPdfStatus('Cards generated. Choose single cards, six-up, nine-up, or Print and Play to download a multi-page PDF.');
     } else if (event.data.type === 'FRONT_OUTPUT_READY') {
+      setBusy(document.getElementById('pdf-status'), false);
       pdfReady = true;
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
       document.getElementById('download-pdf')?.classList.remove('hidden');
-      setPdfStatus(`Generated ${event.data.data.sheets} ${event.data.data.sheets === 1 ? 'sheet' : 'sheets'}. Download the PDF and print at Actual Size (100%).`);
+      setPdfStatus(`Generated ${event.data.data.sheets} ${event.data.data.sheets === 1 ? 'page' : 'pages'}. Download the PDF and print at Actual Size (100%).`);
     } else if (event.data.type === 'PDF_EXPORT_PROGRESS') {
       if (pdfOperation?.id !== message.requestId) return;
       setPdfStatus(`Preparing sheet ${event.data.data.current} of ${event.data.data.total}…`);
@@ -135,7 +153,7 @@ function initMessageListener() {
       showForgeError(event.data.data);
     } else if (event.data.type === 'OUTPUT_SETTINGS') {
       const settings = event.data.data;
-      if (settings && typeof settings.type === 'string' && isFaceMode(settings.type)) {
+      if (settings && typeof settings.type === 'string' && (isFaceMode(settings.type) || ['standard', 'printplay', 'tabletop'].includes(settings.type))) {
         (document.getElementById('forge-type') as HTMLSelectElement).value = settings.type;
         if (settings.paper === 'a4' || settings.paper === 'letter') {
           (document.getElementById('forge-paper') as HTMLSelectElement).value = settings.paper;
@@ -217,8 +235,10 @@ function createDeck(this: HTMLElement, ev: Event) {
   let orientation = (document.getElementById("create-deck-orientation") as HTMLInputElement)?.value;
 
   try {
+    setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), true);
     sendMessage({ type: 'create-deck', name, size, orientation, data: customDeckSize() });
   } catch (error) {
+    setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
     showCreateSizeError(error instanceof Error ? error.message : 'Enter a valid card size.');
   }
 
@@ -488,6 +508,7 @@ function updateCardsEmptyState() {
 }
 
 function invalidateOutput() {
+  setBusy(document.getElementById('pdf-status'), false);
   editRevision++;
   pdfReady = false;
   document.getElementById('download-pdf')?.classList.add('hidden');
@@ -515,6 +536,8 @@ function forgeCards() {
     });
     showForgeError('');
     (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = true;
+    setPdfStatus('Generating cards…');
+    setBusy(document.getElementById('pdf-status'), true);
     sendMessage({ type: 'forge-cards', data: request });
   } catch (error) {
     showForgeError(error instanceof Error ? error.message : 'Check your output settings.');
@@ -528,6 +551,7 @@ function setPdfStatus(message: string) {
 }
 
 function setPdfBusy(busy: boolean) {
+  setBusy(document.getElementById('pdf-status'), busy);
   pdfBusy = busy;
   for (const id of ['box-forge-ok', 'box-forge-cancel', 'download-pdf', 'forge-type', 'forge-paper', 'forge-cut-marks']) {
     (document.getElementById(id) as HTMLButtonElement | HTMLSelectElement).disabled = busy;
@@ -549,7 +573,7 @@ function requestPdf() {
   } });
 }
 
-async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 'a4'; deckName: string; layout: string }, operation: NonNullable<typeof pdfOperation>) {
+async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 'a4'; deckName: string; layout: string; landscape?: boolean; pageSize?: [number, number] }, operation: NonNullable<typeof pdfOperation>) {
   let url: string | undefined;
   try {
     const assertCurrent = () => {
@@ -557,7 +581,7 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
     };
     assertCurrent();
     const images = data.pages.map(page => page instanceof Uint8Array ? page : new Uint8Array(page));
-    const bytes = await createSheetPdf(images, data.paper, { assertCurrent });
+    const bytes = await createSheetPdf(images, data.paper, { assertCurrent, landscape: data.landscape, pageSize: data.pageSize });
     assertCurrent();
     if (bytes.byteLength > 256 * 1024 * 1024) throw new Error('The PDF exceeds the 256 MiB download limit.');
     url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }));
@@ -577,6 +601,7 @@ async function downloadPdfImages(data: { pages: Uint8Array[]; paper: 'letter' | 
 }
 
 function showForgeError(message: string) {
+  if (message) { setBusy(document.getElementById('pdf-status'), false); setPdfStatus(''); }
   const error = document.getElementById('forge-error') as HTMLElement;
   error.textContent = message;
   error.classList.toggle('hidden', !message);
@@ -644,9 +669,10 @@ function updateTemplateSize() {
 
 function initCards() {
   loadCardFields(false);
-  document.getElementById('refresh-artwork')?.addEventListener('click', () => sendMessage({ type: 'load-artwork', data: null }));
+  document.getElementById('refresh-artwork')?.addEventListener('click', () => { setBusy(document.getElementById('refresh-artwork'), true); sendMessage({ type: 'load-artwork', data: null }); });
   document.getElementById('correct-poker-size')?.addEventListener('click', () => {
     (document.getElementById('correct-poker-size') as HTMLButtonElement).disabled = true;
+    setBusy(document.getElementById('correct-poker-size'), true);
     document.getElementById('template-size-note')?.classList.add('hidden');
     sendMessage({ type: 'correct-poker-size', data: null });
   });

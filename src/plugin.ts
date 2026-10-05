@@ -2,7 +2,7 @@
 import { resolveDeckSize } from './card-sizes';
 import { Shape, Board } from '@penpot/plugin-types';
 import type { PluginUIEvent, DeckEvent, CardField } from './model';
-import { isFaceMode, isSheetMode, parseForgeRequest } from './output-options';
+import { isFaceMode, parseForgeRequest } from './output-options';
 import { generateFrontOutput, exportFrontSheets } from './front-output';
 import { correctPokerTemplates, getTemplateSizeInfo } from './template-size';
 import { CsvImporter, validateImportedFields, readDeck, importFields } from './csv-import';
@@ -22,6 +22,7 @@ function sendUi(message: PluginUIEvent, context = deckSession.context) {
     penpot.ui.sendMessage({ ...message, ...context });
 }
 function loadPage() {
+    sendUi({ type: 'THEME_CHANGED', data: penpot.theme });
     sendUi({ type: 'PAGE_CONTEXT', data: deckSession.context });
     loadCardsData();
     loadCardFields();
@@ -36,6 +37,7 @@ penpot.on('pagechange', () => {
     imageTargets.clear();
     loadPage();
 });
+penpot.on('themechange', theme => sendUi({ type: 'THEME_CHANGED', data: theme }));
 
 
 
@@ -347,10 +349,12 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             if (isFaceMode(request.type)) {
                 const output = generateFrontOutput(penpot, outputCards, request.type, request.paper, request.cutMarks, request.cardsData);
                 penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
-                if (!isSheetMode(request.type)) penpot.closePlugin();
-                else sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+                sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
             } else {
-                forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks);
+                const output = forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks, request);
+                penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
+                if (request.type === 'printplay') sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+                else sendUi({ type: 'OUTPUT_READY', data: null });
             }
             penpot.currentPage?.setPluginData('csv-output-stale', 'false');
             if (penpot.currentPage?.getPluginData('csv-import-metadata')) sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });

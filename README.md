@@ -59,7 +59,7 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front's **inside** frame starts with a `#title` text layer and a black `#image` image placeholder. Back also has a black image placeholder inside its **inside** frame for your shared back design.
 2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
 3. Reopen the plugin and use **Edit Deck** to add cards manually or import a CSV. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
-4. Open **Export**, select a layout, and click **Generate Cards**. Six-up and nine-up sheets offer **Download PDF**. Export individual boards through Penpot.
+4. Open **Export**, select a layout, and click **Generate Cards**. Single-card, six-up, nine-up, and fold-over layouts offer **Download PDF**. Export individual boards through Penpot.
 
 The **Back** is a shared design and does not support variable fields. The in-plugin **Help** tab contains the full workflow.
 
@@ -92,7 +92,7 @@ For **Google Sheets**, download the sheet as CSV and import that file. Live Goog
 2. Give it **one image fill** using a sample image. Set its size and crop in Penpot.
 3. Name it after the CSV column containing image filenames, with `#` at the start. An `art` column uses `#art`; an `illustration` column uses `#illustration`. Each variable layer needs a unique name.
 4. Put source images in **Artwork**. In the import view, **Add artwork images** uploads a batch and names each image rectangle after its filename. You can also place and name image rectangles yourself.
-5. Enter the exact image name, including its extension, in the CSV cell: for example, `healing.png`. Apply the import, then generate cards in Export.
+5. Enter the image name in the CSV cell: for example, `healing.png`. Raster file extensions can be omitted from the CSV or Artwork layer name. Exact matches take priority; multiple fallback matches require a unique name or folder path. Apply the import, then generate cards in Export.
 
 Use a path such as `Artwork/creatures/dragon.png` to distinguish duplicate names. Missing or ambiguous matches block the import. A blank mapped image cell clears that field; an unmapped field keeps its template content.
 
@@ -145,7 +145,7 @@ Cards retain their template dimensions. A layout that cannot fit reports an erro
 
 Fronts and backs have separate output containers. Generating one preserves the other. Only recorded plugin-owned output is replaced; unrelated or older unclaimed Output frames are preserved.
 
-**Download PDF** is available for six-up and nine-up front or back sheets after generation. PDFs contain 300-ppi raster sheet images on exact Letter or A4 pages. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
+**Download PDF** is available after generating single fronts, a single shared back, six-up or nine-up sheets, or Print and Play fold-over pages. Single-card PDFs use one page per generated card at its template print size. Sheet PDFs use exact Letter or A4 pages; fold-over pages use A4 in the generated orientation. All PDFs contain 300-ppi raster images. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
 
 ## Automatic deployment
 
@@ -182,7 +182,7 @@ npm ci
 npm run dev
 ```
 
-The development command builds in watch mode and starts the preview. `npm run build` builds without starting a server. Reuse the Tilt-managed service if it is already running; both setups use port 4400.
+The development command builds in watch mode and starts the preview. Automatic UI reload is disabled because it can interrupt operations and disconnect Penpot's controller. Close and reopen the plugin after a rebuild to load both updated parts. `npm run build` builds without starting a server. Reuse the Tilt-managed service if it is already running; both setups use port 4400.
 
 For localhost loading issues, see [Penpot's local plugin instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot).
 

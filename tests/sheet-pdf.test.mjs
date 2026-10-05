@@ -101,3 +101,17 @@ test('an edit delivered between sheet operations aborts PDF assembly', async () 
   };
   await assert.rejects(createSheetPdf([png(2550,3300),png(2550,3300)], 'letter', {assertCurrent}), /Deck changed/);
 });
+
+for (const [name,width,height,pageSize,landscape,points] of [
+  ['single card',750,1050,[180,252],false,[180,252]],
+  ['landscape fold-over',3508,2480,undefined,true,[297*72/25.4,210*72/25.4]],
+]) {
+  test(`${name}: multi-page PDF preserves generated page dimensions`,async()=>{
+    const bytes=await createSheetPdf([png(width,height),png(width,height,200)],'a4',{pageSize,landscape});
+    const pdf=await PDFDocument.load(bytes);assert.equal(pdf.getPageCount(),2);
+    for(const page of pdf.getPages()) {
+      assert.ok(Math.abs(page.getWidth()-points[0])<0.001);
+      assert.ok(Math.abs(page.getHeight()-points[1])<0.001);
+    }
+  });
+}
