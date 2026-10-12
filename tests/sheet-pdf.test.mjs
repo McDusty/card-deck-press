@@ -58,6 +58,15 @@ test('download names are safe and readable', () => {
   assert.equal(pdfFilename('../My Deck!','backs-9'),'My-Deck-backs-9.pdf');
 });
 
+test('index-card PDFs retain 3 × 5 inches and automatic Letter sheets retain landscape paper size', async () => {
+  const single = await PDFDocument.load(await createSheetPdf([png(1500, 900)], 'letter', { pageSize: [360, 216] }));
+  assert.equal(single.getPage(0).getWidth(), 360);
+  assert.equal(single.getPage(0).getHeight(), 216);
+  const sheet = await PDFDocument.load(await createSheetPdf([png(3300, 2550)], 'letter', { landscape: true }));
+  assert.equal(sheet.getPage(0).getWidth(), 792);
+  assert.equal(sheet.getPage(0).getHeight(), 612);
+});
+
 test('PDF assembly compresses each sheet before decoding the next', async () => {
   const create = PDFDocument.create;
   let active = 0, peak = 0;

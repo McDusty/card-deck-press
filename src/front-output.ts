@@ -3,6 +3,8 @@ import type { CardRecord, FaceMode, PaperSize } from './output-options';
 import { calculateFrontLayout, PAGE_GAP } from './front-layout';
 import { calculateCutLines } from './cut-lines';
 import { isFaceMode, isSheetMode, parseForgeRequest } from './output-options';
+import type { ForgeRequest, PaperOrientation } from './output-options';
+import { addCardBuffer } from './page-buffer';
 import { cloneTracked } from './output-clone';
 import { readDeck } from './csv-import';
 import { deckFingerprint } from './deck-fingerprint';
@@ -52,11 +54,19 @@ function validateFields(page: Page, front: Board, cards: readonly CardRecord[]):
   }
 }
 
-function populateCard(page: Page, clone: Board, data: CardRecord): void {
+export function populateCard(page: Page, clone: Board, data: CardRecord): void {
   for (const field of descendants(clone)) {
     if (!field.name.startsWith('#') || !Object.prototype.hasOwnProperty.call(data, field.name)) continue;
     const value = data[field.name];
-    if (field.type === 'text') field.characters = value;
+    if (field.type === 'text') {
+      try {
+        // Penpot rejects empty characters. A space clears visible template text
+        // while retaining the editable layer; stored card/CSV values stay empty.
+        field.characters = value === '' ? ' ' : value;
+      } catch (error) {
+        throw new Error(`Could not update ${field.name} on ${clone.name}: ${error instanceof Error ? error.message : 'Penpot rejected the text.'}`);
+      }
+    }
     else if (field.type === 'rectangle') {
       const image = value ? page.getShapeById(value.split('|')[0]) : null;
       if (value && !image) throw new Error(`The image for ${field.name} is missing. Choose it again.`);
@@ -71,13 +81,13 @@ function ownedCompleteOutput(page: Page, id: string, owner: string): Board | nul
   return shape?.type === 'board' && shape.getPluginData(OWNER_KEY) === owner && shape.getPluginData(STATE_KEY) === 'complete' ? shape : null;
 }
 
-export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceMode, paper: PaperSize, cutLines: boolean, sourceCards: readonly CardRecord[] = cards): Board {
+export function generateFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceMode, paper: PaperSize, cutLines: boolean, sourceCards: readonly CardRecord[] = cards, paperOrientation: PaperOrientation = 'auto', gapMm = 0, bufferColor = '#FFFFFF'): Board {
   const undo = api.history.undoBlockBegin();
-  try { return buildFrontOutput(api, cards, mode, paper, cutLines, sourceCards); }
+  try { return buildFrontOutput(api, cards, mode, paper, cutLines, sourceCards, paperOrientation, gapMm, bufferColor); }
   finally { api.history.undoBlockFinish(undo); }
 }
 
-function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceMode, paper: PaperSize, cutLines: boolean, sourceCards: readonly CardRecord[]): Board {
+function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceMode, paper: PaperSize, cutLines: boolean, sourceCards: readonly CardRecord[], paperOrientation: PaperOrientation, gapMm: number, bufferColor: string): Board {
   const page = api.currentPage;
   if (!page) throw new Error('Open a Penpot page first.');
   const backOnly = mode.startsWith('backs-');
@@ -86,7 +96,7 @@ function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceM
   const cleanupKey = backOnly ? 'back-output-cleanup' : CLEANUP_KEY;
   const front = getFrontTemplate(page, backOnly ? 'Back' : 'Front');
   const outputCards = mode === 'backs-single' ? cards.slice(0, 1) : cards;
-  const layout = calculateFrontLayout(mode, front.width, front.height, outputCards.length, paper);
+  const layout = calculateFrontLayout(mode, front.width, front.height, outputCards.length, paper, paperOrientation, gapMm);
   if (!backOnly) validateFields(page, front, cards);
   const owner = `${page.id}:${front.id}`;
   const previousId = page.getPluginData(currentKey);
@@ -134,6 +144,9 @@ function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceM
         card.name = `${backOnly ? 'Back' : 'Front'} ${String(offset + slot + 1).padStart(2, '0')}`;
         card.x = container.x + layout.startX + (slot % layout.columns) * (front.width + layout.gap);
         card.y = container.y + layout.startY + Math.floor(slot / layout.columns) * (front.height + layout.gap);
+        if (isSheetMode(mode) && layout.gap > 0) addCardBuffer(() => {
+          const shape = api.createRectangle(); created.push(shape); return shape;
+        }, container, card, layout.gap, bufferColor);
         if (!backOnly) populateCard(page, card, data);
       }
       if (cutLines && isSheetMode(mode)) {
@@ -152,7 +165,7 @@ function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceM
     }
     if (api.currentPage?.id !== page.id) throw new Error('The active page changed. Return to the deck and try again.');
     output.name = `${label} Output`;
-    output.setPluginData(REQUEST_KEY, JSON.stringify({ cardsData: sourceCards, type: mode, cutMarks: cutLines, paper }));
+    output.setPluginData(REQUEST_KEY, JSON.stringify({ cardsData: sourceCards, type: mode, cutMarks: cutLines, paper, paperOrientation, gapMm, bufferColor }));
     output.setPluginData(TEMPLATE_KEY, templateSignature(front));
     output.setPluginData(STATE_KEY, 'complete');
     page.setPluginData(cleanupKey, current?.id ?? '');
@@ -178,12 +191,18 @@ function buildFrontOutput(api: Penpot, cards: readonly CardRecord[], mode: FaceM
   return output;
 }
 
+function matchesRequest(raw: string, request: ForgeRequest): boolean {
+  // Older output has no orientation setting; normalize its default before comparing.
+  try { return JSON.stringify(parseForgeRequest(JSON.parse(raw))) === JSON.stringify(request); }
+  catch { return false; }
+}
+
 export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: () => boolean = () => true,
   progress: (data: { current: number; total: number }) => void = data => api.ui.sendMessage({ type: 'PDF_EXPORT_PROGRESS', data })):
   Promise<{ pages: Uint8Array[]; paper: PaperSize; deckName: string; layout: string; landscape: boolean; pageSize?: [number, number] }> {
   const request = parseForgeRequest(value);
   const foldOver = request.type === 'printplay';
-  if (!isFaceMode(request.type) && !foldOver) throw new Error('Choose single cards, six-up, nine-up, or Print and Play.');
+  if (!isFaceMode(request.type) && !foldOver) throw new Error('Choose single cards, automatic pages, six-up, nine-up, or Print and Play.');
   const page = api.currentPage;
   if (!page) throw new Error('Open the deck page first.');
   if (page.getPluginData('cardsData') && JSON.stringify(readDeck(page)) !== JSON.stringify(request.cardsData)) {
@@ -198,7 +217,7 @@ export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: 
   const output = foldOver ? candidate?.type === 'board' && candidate.getPluginData('cardforge-legacy-state') === 'complete' &&
     candidate.getPluginData('cardforge-legacy-owner') === `${page.id}:${front.id}:${getFrontTemplate(page, 'Back').id}` ? candidate : null
     : ownedCompleteOutput(page, page.getPluginData(currentKey), `${page.id}:${front.id}`);
-  if (!output || output.getPluginData(REQUEST_KEY) !== JSON.stringify(request) || output.getPluginData(TEMPLATE_KEY) !== signature()) {
+  if (!output || !matchesRequest(output.getPluginData(REQUEST_KEY), request) || output.getPluginData(TEMPLATE_KEY) !== signature()) {
     throw new Error('The deck or settings changed. Forge again before downloading.');
   }
   const sheets = output.children;
@@ -222,6 +241,6 @@ export async function exportFrontSheets(api: Penpot, value: unknown, isCurrent: 
     }
   }
   return { pages, paper: foldOver ? 'a4' : request.paper, deckName: page.name, layout: request.type,
-    landscape: foldOver && sheets[0].width > sheets[0].height,
+    landscape: (foldOver || isSheetMode(request.type)) && sheets[0].width > sheets[0].height,
     pageSize: !foldOver && !isSheetMode(request.type) ? [front.width * 72 / 300, front.height * 72 / 300] : undefined };
 }

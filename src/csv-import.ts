@@ -195,12 +195,21 @@ export class CsvImporter {
     const cards = readDeck(page);
     const fieldNames = [...new Set(cards.flatMap(card => Object.keys(card).filter(name => name.startsWith('#'))))];
     const assets = listArtwork(page);
-    const imageFields = importFields(page).filter(field => field.type === 'image').map(field => field.name);
+    // Saved bindings describe the stored values even after a template field is
+    // removed, renamed, or changed to another type.
+    const fieldTypes = new Map([...importFields(page), ...(readMetadata(page)?.fields ?? [])].map(field => [field.name, field.type]));
     const used = new Set(cards.map(card => card.card_id).filter(Boolean));
     return writeCsv(['card_id', 'quantity', ...fieldNames], cards.map((card, index) => {
       let id = card.card_id;
       if (!id) { id = `manual-${index + 1}`; while (used.has(id)) id += '-'; used.add(id); }
-      return [id, card.quantity ?? '1', ...fieldNames.map(name => imageFields.includes(name) && card[name] ? assets.find(asset => asset.reference.split('|')[0] === card[name].split('|')[0])?.path ?? 'MISSING_ARTWORK' : card[name] ?? '')];
+      return [id, card.quantity ?? '1', ...fieldNames.map(name => {
+        const value = card[name] ?? '';
+        const asset = value.includes('|') ? assets.find(asset => asset.reference.split('|')[0] === value.split('|')[0]) : undefined;
+        // Manual decks may predate saved import bindings. Resolve their existing
+        // artwork references when the original template field is no longer there.
+        const isImage = fieldTypes.get(name) === 'image' || (!fieldTypes.has(name) && Boolean(asset));
+        return isImage && value ? asset?.path ?? 'MISSING_ARTWORK' : value;
+      })];
     }), spreadsheetSafe);
   }
   status() {

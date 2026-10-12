@@ -25,6 +25,8 @@ import type { ArtworkCell } from './artwork-cell';
 import type { ArtworkAsset } from './artwork';
 import { closeArtworkPicker } from './artwork-picker';
 import { ArtworkPreviews } from './artwork-previews';
+import { calculateFrontLayout } from './front-layout';
+import { updateLayoutChoices } from './layout-choices';
 let artworkAssets: ArtworkAsset[] = [];
 const artworkCells = new Map<string, ArtworkCell>();
 const artworkKey = (rowId: string, name: string) => JSON.stringify([rowId, name]);
@@ -154,7 +156,7 @@ function initMessageListener() {
     } else if (event.data.type === 'OUTPUT_READY') {
       setBusy(document.getElementById('pdf-status'), false);
       (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
-      setPdfStatus('Cards generated. Choose single cards, six-up, nine-up, or Print and Play to download a multi-page PDF.');
+      setPdfStatus('Cards generated. Choose single cards, automatic pages, six-up, nine-up, or Print and Play to download a multi-page PDF.');
     } else if (event.data.type === 'FRONT_OUTPUT_READY') {
       setBusy(document.getElementById('pdf-status'), false);
       pdfReady = true;
@@ -181,7 +183,16 @@ function initMessageListener() {
         if (settings.paper === 'a4' || settings.paper === 'letter') {
           (document.getElementById('forge-paper') as HTMLSelectElement).value = settings.paper;
         }
-        if (typeof settings.cutMarks === 'boolean') sheetCutLines = settings.cutMarks;
+        (document.getElementById('forge-paper-orientation') as HTMLSelectElement).value =
+          settings.paperOrientation === 'portrait' || settings.paperOrientation === 'landscape' ? settings.paperOrientation : 'auto';
+        (document.getElementById('forge-gap') as HTMLInputElement).value = String(settings.gapMm ?? 0);
+        const color = settings.bufferColor ?? '#FFFFFF';
+        (document.getElementById('forge-buffer-color') as HTMLSelectElement).value = ['#FFFFFF', '#000000'].includes(color) ? color : 'custom';
+        (document.getElementById('forge-buffer-custom') as HTMLInputElement).value = color;
+        if (typeof settings.cutMarks === 'boolean') {
+          sheetCutLines = settings.cutMarks;
+          (document.getElementById('forge-cut-marks') as HTMLSelectElement).value = String(settings.cutMarks);
+        }
         changeForgeType(false);
       }
     }
@@ -260,7 +271,8 @@ function createDeck(this: HTMLElement, ev: Event) {
 
   try {
     setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), true);
-    sendMessage({ type: 'create-deck', name, size, orientation, data: customDeckSize() });
+    const templateStyle = (document.getElementById('create-deck-style') as HTMLSelectElement).value;
+    sendMessage({ type: 'create-deck', name, size, orientation, templateStyle, data: customDeckSize() });
   } catch (error) {
     setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
     showCreateSizeError(error instanceof Error ? error.message : 'Enter a valid card size.');
@@ -572,6 +584,8 @@ function forgeCards() {
       type: (document.getElementById('forge-type') as HTMLSelectElement).value,
       cutMarks: (document.getElementById('forge-cut-marks') as HTMLSelectElement).value,
       paper: (document.getElementById('forge-paper') as HTMLSelectElement).value,
+      paperOrientation: (document.getElementById('forge-paper-orientation') as HTMLSelectElement).value,
+      ...bufferSettings(),
     });
     showForgeError('');
     (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = true;
@@ -592,8 +606,16 @@ function setPdfStatus(message: string) {
 function setPdfBusy(busy: boolean) {
   setBusy(document.getElementById('pdf-status'), busy);
   pdfBusy = busy;
-  for (const id of ['box-forge-ok', 'box-forge-cancel', 'download-pdf', 'forge-type', 'forge-paper', 'forge-cut-marks']) {
+  for (const id of ['box-forge-ok', 'box-forge-cancel', 'download-pdf', 'forge-type', 'forge-paper', 'forge-paper-orientation', 'forge-cut-marks', 'forge-gap', 'forge-buffer-color', 'forge-buffer-custom']) {
     (document.getElementById(id) as HTMLButtonElement | HTMLSelectElement).disabled = busy;
+  }
+  if (!busy) {
+    const mode = (document.getElementById('forge-type') as HTMLSelectElement).value;
+    const buffered = isSheetMode(mode) || mode === 'printplay';
+    const gap = document.getElementById('forge-gap') as HTMLInputElement;
+    gap.disabled = !buffered;
+    (document.getElementById('forge-buffer-color') as HTMLSelectElement).disabled = !buffered || Number(gap.value) === 0;
+    (document.getElementById('forge-buffer-custom') as HTMLInputElement).disabled = !buffered || Number(gap.value) === 0;
   }
   if (!busy) (document.getElementById('forge-cut-marks') as HTMLSelectElement).disabled = !isSheetMode((document.getElementById('forge-type') as HTMLSelectElement).value) && (document.getElementById('forge-type') as HTMLSelectElement).value !== 'standard' && (document.getElementById('forge-type') as HTMLSelectElement).value !== 'printplay';
 }
@@ -608,6 +630,8 @@ function requestPdf() {
     cardsData,
     type: (document.getElementById('forge-type') as HTMLSelectElement).value,
     paper: (document.getElementById('forge-paper') as HTMLSelectElement).value,
+      paperOrientation: (document.getElementById('forge-paper-orientation') as HTMLSelectElement).value,
+      ...bufferSettings(),
     cutMarks: (document.getElementById('forge-cut-marks') as HTMLSelectElement).value,
   } });
 }
@@ -654,11 +678,32 @@ function showForgeError(message: string) {
   (document.getElementById('box-forge-ok') as HTMLButtonElement).disabled = false;
 }
 
+function bufferSettings() {
+  const mode = (document.getElementById('forge-type') as HTMLSelectElement).value;
+  if (!isSheetMode(mode) && mode !== 'printplay') return { gapMm: 0, bufferColor: '#FFFFFF' };
+  const gapValue = (document.getElementById('forge-gap') as HTMLInputElement).value;
+  const color = (document.getElementById('forge-buffer-color') as HTMLSelectElement).value;
+  return { gapMm: gapValue === '' ? Number.NaN : Number(gapValue), bufferColor: color === 'custom' ? (document.getElementById('forge-buffer-custom') as HTMLInputElement).value : color };
+}
+
 function changeForgeType(invalidate = true) {
+  const layoutSelect = document.getElementById('forge-type') as HTMLSelectElement;
+  const paper = (document.getElementById('forge-paper') as HTMLSelectElement).value === 'a4' ? 'a4' : 'letter';
+  const orientation = (document.getElementById('forge-paper-orientation') as HTMLSelectElement).value;
+  const buffer = { ...bufferSettings(), gapMm: Number((document.getElementById('forge-gap') as HTMLInputElement).value) };
+  const validGap = Number.isFinite(buffer.gapMm) && buffer.gapMm >= 0 && buffer.gapMm <= 10;
+  const layoutChanged = updateLayoutChoices(layoutSelect, templateSizeInfo.templates, paper, orientation === 'portrait' || orientation === 'landscape' ? orientation : 'auto', validGap ? buffer.gapMm : 0);
+  if (layoutChanged) invalidateOutput();
   try { for (const card of cardsData) cardQuantity(card); }
   catch (error) { showForgeError(error instanceof Error ? error.message : 'Check quantities.'); return; }
   const text = document.getElementById("forge-explain-type") as HTMLInputElement;
-  const value = (document.getElementById("forge-type") as HTMLInputElement).value;
+  const value = layoutSelect.value;
+  const buffered = isSheetMode(value) || value === 'printplay';
+  document.getElementById('forge-buffer-options')?.classList.toggle('hidden', !buffered);
+  document.getElementById('forge-buffer-custom-field')?.classList.toggle('hidden', (document.getElementById('forge-buffer-color') as HTMLSelectElement).value !== 'custom');
+  (document.getElementById('forge-gap') as HTMLInputElement).disabled = pdfBusy || !buffered;
+  (document.getElementById('forge-buffer-color') as HTMLSelectElement).disabled = pdfBusy || !buffered || buffer.gapMm === 0;
+  (document.getElementById('forge-buffer-custom') as HTMLInputElement).disabled = pdfBusy || !buffered || buffer.gapMm === 0;
   const cutMarks = document.getElementById("forge-cut-marks") as HTMLInputElement
   const frontOnly = isFaceMode(value);
   if (invalidate) invalidateOutput();
@@ -673,13 +718,32 @@ function changeForgeType(invalidate = true) {
     text.innerText = !isSheetMode(value)
       ? backOnly ? 'One separate board with the shared Back design. No fronts.' : `One separate front board per included design (${cardsData.filter(card => cardQuantity(card) > 0).length} cards). No backs.`
       : `${value.endsWith('-6') ? '2 × 3' : '3 × 3'} grid, ${sheetCount} ${sheetCount === 1 ? 'sheet' : 'sheets'} for ${count} ${backOnly ? 'backs' : 'fronts'}. 5 mm margins. Cards share edges with no gaps; template size is preserved.`;
+    if (isSheetMode(value)) {
+      const template = templateSizeInfo.templates.find(item => item.name === (backOnly ? 'Back' : 'Front'));
+      text.innerText = `Full-size cards on Letter or A4 with 5 mm margins. Choose Auto, Portrait, or Landscape for the page. ${buffer.gapMm > 0 ? `${buffer.gapMm} mm between cards, with a matching outer buffer.` : 'Cards share edges with no gaps.'}`;
+      if (template && count > 0) {
+        try {
+          const paper = (document.getElementById('forge-paper') as HTMLSelectElement).value === 'a4' ? 'a4' : 'letter';
+          const orientation = (document.getElementById('forge-paper-orientation') as HTMLSelectElement).value;
+          const layout = calculateFrontLayout(value, template.width, template.height, count, paper, orientation === 'portrait' || orientation === 'landscape' ? orientation : 'auto', buffer.gapMm);
+          text.innerText = `${layout.perPage} cards per ${layout.width > layout.height ? 'landscape' : 'portrait'} page (${layout.columns} × ${layout.rows}). ${layout.pageCount} ${layout.pageCount === 1 ? 'page' : 'pages'} for ${count} ${backOnly ? 'backs' : 'fronts'}. ${buffer.gapMm > 0 ? `${buffer.gapMm} mm between cards, with a matching outer buffer` : 'no gaps'}. 5 mm margins. Cards keep their full size.`;
+        } catch (error) { text.innerText = error instanceof Error ? error.message : 'Choose another paper or single cards.'; }
+      }
+    }
     cutMarks.value = !isSheetMode(value) ? 'false' : sheetCutLines ? 'true' : 'false';
     cutMarks.disabled = !isSheetMode(value);
   } else if (value == "standard") {
     text.innerText = "It will generate a frame for each card, and an extra frame for the back.";
     cutMarks.disabled = false;
   } else if (value == "printplay") {
-    text.innerText = "A4 pages with the cards. Cards with the front and the back joined, to cut them together and fold them by the joint.";
+    text.innerText = "A4 pages with the front and back joined, to cut together and fold at the joint.";
+    const template = templateSizeInfo.templates.find(item => item.name === 'Front');
+    if (template && buffer.gapMm > 0 && printedCopies(cardsData) > 0) {
+      try {
+        const layout = calculateFrontLayout('fronts-auto', template.width, template.height * 2, printedCopies(cardsData), 'a4', 'auto', buffer.gapMm);
+        text.innerText += ` ${layout.perPage} pairs per page; ${layout.pageCount} pages. ${buffer.gapMm} mm buffer between pairs. The fold stays joined.`;
+      } catch (error) { text.innerText = error instanceof Error ? error.message : 'Choose a smaller buffer.'; }
+    }
     cutMarks.disabled = false;
   } else {
     text.innerHTML = "It will generate a frame with a <a href='https://kb.tabletopsimulator.com/custom-content/custom-deck/' target='_blank'>card set for Tabletop Simulator</a>.";
@@ -697,7 +761,9 @@ function changeCutMarks() {
   const sheet = isSheetMode(mode);
   if (sheet) sheetCutLines = enabled;
   if (enabled) {
-    text.innerText = sheet ? 'One straight cut line at each shared card edge.' : 'Cut marks will be printed to indicate how to cut the cards.';
+    text.innerText = sheet
+      ? bufferSettings().gapMm > 0 ? 'Cut lines mark both sides of each gap. Trim away the gap to keep the finished card size.' : 'One straight cut line at each shared card edge.'
+      : 'Cut marks will be printed to indicate how to cut the cards.';
   } else {
     text.innerText = "No cut lines.";
   }
@@ -711,6 +777,7 @@ function updateTemplateSize() {
   button.classList.toggle('hidden', !templateSizeInfo.canCorrectPoker);
   const label = document.getElementById('forge-template-size');
   if (label) label.textContent = description ? `${description}. Cards keep this size.` : '';
+  if (!pdfBusy && !document.getElementById('tab-export')?.classList.contains('hidden')) changeForgeType(false);
 }
 
 function initCards() {
@@ -733,10 +800,10 @@ function initCards() {
   document.getElementById("forge-type")?.addEventListener("change", () => { changeForgeType() });
   document.getElementById("forge-cut-marks")?.addEventListener("change", () => { changeCutMarks() });
   document.getElementById('download-pdf')?.addEventListener('click', requestPdf);
-  for (const id of ['forge-paper', 'forge-cut-marks']) document.getElementById(id)?.addEventListener('change', () => {
+  for (const id of ['forge-paper', 'forge-paper-orientation', 'forge-cut-marks', 'forge-gap', 'forge-buffer-color', 'forge-buffer-custom']) document.getElementById(id)?.addEventListener('change', () => {
     pdfReady = false;
     document.getElementById('download-pdf')?.classList.add('hidden');
-    if (id === 'forge-paper') changeForgeType();
+    changeForgeType();
     setPdfStatus('Settings changed. Forge again to download.');
   });
 }

@@ -46,3 +46,44 @@ test('saved local rows remain editable after a Sheets attempt is canceled on the
   assert.equal(f.sent.at(-1).type, 'save-cards-data'); assert.equal(f.sent.at(-1).epoch, 2);
   assert.equal(JSON.parse(f.sent.at(-1).data)[0].quantity, '3');
 });
+
+function exportFixture() {
+  const f = fixture();
+  f.element('forge-type').options = ['fronts-single', 'fronts-auto', 'fronts-6', 'fronts-9', 'backs-single', 'backs-auto', 'backs-6', 'backs-9', 'standard', 'printplay', 'tabletop'].map(value => ({ value }));
+  f.element('forge-cut-marks').value = 'false';
+  f.element('forge-paper').value = 'letter';
+  f.element('forge-paper-orientation').value = 'auto';
+  f.element('forge-gap').value = '0';
+  f.element('forge-buffer-color').value = '#FFFFFF';
+  f.element('tab-export').classList.add('hidden');
+  const event = (type, data, extra = {}) => f.message({ type, data, pageId: null, session: 0, epoch: 0, ...extra });
+  return { ...f, event };
+}
+
+for (const type of ['printplay', 'standard']) {
+  test(`reopening ${type} restores saved cut lines instead of using the previous view`, () => {
+    const f = exportFixture();
+    f.event('OUTPUT_SETTINGS', { type, cutMarks: true });
+    assert.equal(f.element('forge-cut-marks').value, 'true');
+    f.event('OUTPUT_SETTINGS', { type, cutMarks: false });
+    assert.equal(f.element('forge-cut-marks').value, 'false');
+  });
+}
+
+test('buffered sheet guidance describes paired trim lines, including before adding rows', () => {
+  const f = exportFixture();
+  f.event('OUTPUT_SETTINGS', { type: 'fronts-auto', gapMm: 2, cutMarks: true });
+  assert.match(f.element('forge-explain-type').innerText, /2 mm/);
+  assert.doesNotMatch(f.element('forge-explain-type').innerText, /no gaps/);
+  assert.match(f.element('forge-explain-marks').innerText, /both sides/);
+  f.event('OUTPUT_SETTINGS', { type: 'fronts-auto', gapMm: 0, cutMarks: true });
+  assert.match(f.element('forge-explain-marks').innerText, /shared card edge/);
+});
+
+test('buffered fold-over preview counts actual card pairs with cut lines enabled', () => {
+  const f = exportFixture();
+  f.event('TEMPLATE_SIZE', { templates: [{ name: 'Front', width: 750, height: 1050 }], canCorrectPoker: false });
+  f.event('CARDS_DATA', JSON.stringify([{ quantity: '10' }]), { rowIds: ['row-1'] });
+  f.event('OUTPUT_SETTINGS', { type: 'printplay', gapMm: 2, cutMarks: true });
+  assert.match(f.element('forge-explain-type').innerText, /4 pairs per page; 3 pages/);
+});

@@ -1,5 +1,7 @@
 # Card Deck Press Feasibility Checks
 
+> Historical planning and investigation notes, not current user instructions. For supported workflows, use the [README](../README.md) and [printing guide](printing-guide.md). Some features described below as future work have since been implemented.
+
 **Status:** Started. **Date:** October 1, 2026.
 
 This document tracks evidence needed before implementing the [product requirements](cardforge-prd.md). A documented API or a passing build is not a live Penpot integration test.

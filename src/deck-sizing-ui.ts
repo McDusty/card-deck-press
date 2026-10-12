@@ -1,4 +1,4 @@
-import { cardSizes, DEFAULT_CARD_SIZE, formatDimensions, fromPixels, resolveDeckSize, toPixels } from './card-sizes';
+import { cardSizes, DEFAULT_CARD_SIZE, formatDimensions, fromPixels, isIndexCardSize, resolveDeckSize, toPixels } from './card-sizes';
 import type { CardDimensions, MeasurementUnit } from './card-sizes';
 
 export function initDeckSizing(): () => CardDimensions | null {
@@ -9,6 +9,8 @@ export function initDeckSizing(): () => CardDimensions | null {
   const width = document.getElementById('custom-card-width') as HTMLInputElement;
   const height = document.getElementById('custom-card-height') as HTMLInputElement;
   const note = document.getElementById('create-size-note')!;
+  const style = document.getElementById('create-deck-style') as HTMLSelectElement;
+  let wasIndexSize = isIndexCardSize(size.value);
   let unit: MeasurementUnit = 'px';
   let custom: CardDimensions = { width: 750, height: 1050 };
   const read = () => { custom = { width: toPixels(width.valueAsNumber, unit), height: toPixels(height.valueAsNumber, unit) }; };
@@ -42,7 +44,15 @@ export function initDeckSizing(): () => CardDimensions | null {
   };
   units.value = unit;
   units.addEventListener('change', () => { unit = units.value as MeasurementUnit; write(); refresh(); });
-  size.addEventListener('change', refresh);
+  size.addEventListener('change', () => {
+    const indexSize = isIndexCardSize(size.value);
+    if (indexSize !== wasIndexSize && size.value !== 'custom') {
+      orientation.value = indexSize ? 'landscape' : 'portrait';
+      style.value = indexSize ? 'blank' : 'title-image';
+    }
+    wasIndexSize = indexSize;
+    refresh();
+  });
   orientation.addEventListener('change', refresh);
   for (const input of [width, height]) input.addEventListener('input', () => { read(); refresh(); });
   write(); refresh();

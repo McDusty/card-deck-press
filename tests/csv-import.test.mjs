@@ -53,6 +53,35 @@ test('export retains the artwork name after replacing the image fill', () => {
   assert.equal(parseCsv(exported.data).rows[0].values[2],'Artwork/dragon.png');
 });
 
+for (const change of ['remove', 'rename', 'change type']) {
+  test(`CSV backup retains imported image names after template field ${change}`, () => {
+    const f = fixture(); const field = imageField(f); artwork(f);
+    const result = preview(f, 'card_id,art\n001,dragon.png'); f.message('csv-apply', result.data.token);
+    if (change === 'remove') field.remove();
+    else if (change === 'rename') field.name = '#new-art';
+    else { field.remove(); const text = f.api.createText('New text'); text.name = '#art'; f.front.appendChild(text); }
+    const exported = f.message('csv-export', null);
+    assert.equal(exported.type, 'CSV_EXPORT');
+    assert.equal(parseCsv(exported.data).rows[0].values[2], 'Artwork/dragon.png');
+    // The backup can be imported into a repaired image template.
+    for (const child of [...f.front.children]) if (child.name === '#art') child.remove();
+    imageField(f);
+    const restored = preview(f, exported.data, { card_id: 'card_id', quantity: 'quantity', '#art': '#art' });
+    assert.equal(restored.data.errors.length, 0);
+    assert.equal(restored.data.artworkMatches, 1);
+  });
+}
+
+test('manual image backups resolve removed fields without rewriting known text references', () => {
+  const f = fixture(); const field = imageField(f); const image = artwork(f);
+  const reference = `${image.id}|${image.fills[0].fillImage.id}`;
+  f.message('save-cards-data', JSON.stringify([{ '#art': reference, '#name': reference }]));
+  field.remove();
+  const table = parseCsv(f.message('csv-export', null).data);
+  assert.equal(table.rows[0].values[table.headers.indexOf('#art')], 'Artwork/dragon.png');
+  assert.equal(table.rows[0].values[table.headers.indexOf('#name')], reference);
+});
+
 test('failed restoration rolls back dataset, mappings, settings and backup', () => {
   const f=fixture(); let result=preview(f,'card_id,name\n001,Original'); f.message('csv-apply',result.data.token);
   result=preview(f,'card_id,name\n001,Updated'); f.message('csv-apply',result.data.token);

@@ -1,7 +1,10 @@
 import type { Penpot, Page, Shape, Board } from '@penpot/plugin-types';
 import type { CardRecord, LegacyMode } from './output-options';
-import { getFrontTemplate, templateSignature } from './front-output';
+import { getFrontTemplate, populateCard, templateSignature } from './front-output';
 import type { ForgeRequest } from './output-options';
+import { addCardBuffer } from './page-buffer';
+import { calculateFrontLayout, CANVAS_UNITS_PER_MM } from './front-layout';
+import { calculateCutLines } from './cut-lines';
 import { cloneTracked } from './output-clone';
 
 const OWNER = 'cardforge-legacy-owner', STATE = 'cardforge-legacy-state';
@@ -52,35 +55,12 @@ class LegacyBuild {
   }
 }
 
-function findByName(parent: Board, name: string): Shape | undefined {
-  for (const child of parent.children) {
-    if (child.name === name) return child;
-    if ('children' in child) { const found = findByName(child as Board, name); if (found) return found; }
-  }
-}
-
-function cloneCard(api: Penpot, build: LegacyBuild, card: Shape, cardData: Record<string, any>, cardNum: string): Board {
+function cloneCard(api: Penpot, build: LegacyBuild, card: Shape, cardData: CardRecord, cardNum: string): Board {
     const card2 = build.clone(card) as Board;
     card2.name = "card" + cardNum.padStart(2, '0');
 
-    for (const prop in cardData) {
-        if (Object.prototype.hasOwnProperty.call(cardData, prop)) {
-            const field = findByName(card2, prop);
-            if (field) {
-                if (field.type === "text") {
-                    field.characters = cardData[prop];
-                } else {
-                    const imageId = cardData[prop].split("|")[0];
-                    const image = api.currentPage?.getShapeById(imageId);
-                    if (!cardData[prop]) field.fills = [];
-                    else if (image && image.fills !== 'mixed') {
-                        const fillImage = image.fills.find(fill => fill.fillImage)?.fillImage;
-                        field.fills = fillImage ? [{ ...(Array.isArray(field.fills) ? field.fills[0] : {}), fillImage }] : [];
-                    }
-                }
-            }
-        }
-    }
+    if (!api.currentPage) throw new Error('Open a deck page first.');
+    populateCard(api.currentPage, card2, cardData);
 
     return card2;
 }
@@ -181,7 +161,9 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
     const frontTemplate = getFrontTemplate(page);
     const backTemplate = getFrontTemplate(page, 'Back');
     if (!frontTemplate || !backTemplate) throw new Error('This layout needs Front and Back boards. Choose a Fronts only layout to omit backs.');
-    if (type === 'printplay' && Math.max(
+    const gapMm = request?.gapMm ?? 0;
+    const bufferedLayout = type === 'printplay' && gapMm > 0 ? calculateFrontLayout('fronts-auto', frontTemplate.width, frontTemplate.height * 2, cardsData.length, 'a4', 'auto', gapMm) : null;
+    if (type === 'printplay' && !bufferedLayout && Math.max(
         countRectsFit({ width: 2480, height: 3508 }, { width: frontTemplate.width + (cutMarks ? 200 : 0), height: frontTemplate.height * 2 + (cutMarks ? 200 : 0) }),
         countRectsFit({ width: 3508, height: 2480 }, { width: frontTemplate.width + (cutMarks ? 200 : 0), height: frontTemplate.height * 2 + (cutMarks ? 200 : 0) })
     ) === 0) throw new Error('A front-and-back pair does not fit on A4. Choose a smaller template or another layout.');
@@ -245,7 +227,7 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
         tmpFront.appendChild(frontClone);
         frontClone.x = 0;
         frontClone.y = frontClone.height;
-        if (cutMarks) {
+        if (cutMarks && !bufferedLayout) {
             tmpFront = addCutMarks(build, tmpFront, false);
         }
         baseFront = tmpFront;
@@ -274,14 +256,17 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
             cardsPerPage = fitLandscape;
         }
 
+        if (bufferedLayout) {
+            width = bufferedLayout.width; height = bufferedLayout.height; cardsPerPage = bufferedLayout.perPage;
+        }
         let numPages = Math.ceil(cardsData.length / cardsPerPage);
         let numCard = 0;
 
         output.resize(width, (height + 100) * numPages);
 
 
-        let cardsPerLine = Math.floor(width / baseFront.width);
-        let linesPerPage = Math.floor(height / baseFront.height);
+        let cardsPerLine = bufferedLayout?.columns ?? Math.floor(width / baseFront.width);
+        let linesPerPage = bufferedLayout?.rows ?? Math.floor(height / baseFront.height);
         let gapH = Math.floor((width - cardsPerLine * baseFront.width) / (cardsPerLine + 1));
         let gapV = Math.floor((height - linesPerPage * baseFront.height) / (linesPerPage + 1));
 
@@ -289,6 +274,7 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
             page = build.board();
             page.name = "Page " + String(i + 1).padStart(2, '0');
             page.resize(width, height);
+            if (bufferedLayout) page.fills = [{ fillColor: '#FFFFFF', fillOpacity: 1 }];
             page.x = output.x;
             page.y = output.y + i * (height + 100);
 
@@ -304,9 +290,28 @@ export function forgeLegacyCards(api: Penpot, cardsData: CardRecord[], type: Leg
                 page.appendChild(card);
                 card.x = page.x + gapH + (j % cardsPerLine) * (card.width + gapH);
                 card.y = page.y + gapV + Math.floor(j / cardsPerLine) * (card.height + gapV);
+                if (bufferedLayout) {
+                    card.x = page.x + bufferedLayout.startX + (j % cardsPerLine) * (card.width + bufferedLayout.gap);
+                    card.y = page.y + bufferedLayout.startY + Math.floor(j / cardsPerLine) * (card.height + bufferedLayout.gap);
+                    addCardBuffer(() => build.rectangle(), page, card, gapMm * CANVAS_UNITS_PER_MM, request!.bufferColor);
+                }
                 numCard++;
                 if (numCard >= cardsData.length) {
                     break;
+                }
+            }
+            if (bufferedLayout && cutMarks) {
+                // Trim the actual pairs, without crop-mark wrappers widening the
+                // chosen gap. The shared front/back fold is not a cut edge.
+                const count = Math.min(cardsPerPage, cardsData.length - i * cardsPerPage);
+                for (const line of calculateCutLines(bufferedLayout, baseFront.width, baseFront.height, count)) {
+                    const mark = build.rectangle();
+                    page.appendChild(mark);
+                    mark.name = 'Cut line';
+                    mark.resize(line.width, line.height);
+                    mark.x = page.x + line.x; mark.y = page.y + line.y;
+                    mark.fills = [{ fillColor: '#000000', fillOpacity: 1 }];
+                    mark.strokes = [];
                 }
             }
             output.appendChild(page);

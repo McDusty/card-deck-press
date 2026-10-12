@@ -1,5 +1,7 @@
 # Card Deck Press Product Requirements Draft
 
+> Historical planning and investigation notes, not current user instructions. For supported workflows, use the [README](../README.md) and [printing guide](printing-guide.md). Some features described below as future work have since been implemented.
+
 **Status:** Draft for review, revised after adversarial review. **Date:** October 1, 2026.
 
 🔑 Extend Cardforge so a card creator can design in Penpot, manage content in a spreadsheet, and regenerate a deck without rebuilding cards by hand.

@@ -14,6 +14,7 @@ export interface DeckEvent extends BaseEvent {
     name: string;
     size: string;
     orientation: string;
+    templateStyle?: unknown;
 }
 
 export interface CardField {

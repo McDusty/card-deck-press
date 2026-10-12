@@ -24,12 +24,17 @@ export function createFakePenpot(options = {}) {
       this._y = 0;
       this.fills = [];
       this.strokes = [];
-      this.characters = '';
+      this._characters = '';
       this.parent = null;
       this.data = new Map();
       if (type === 'board') this.children = [];
       shapes.set(this.id, this);
       if (attach) root.appendChild(this);
+    }
+    get characters() { return this._characters; }
+    set characters(value) {
+      if (this.type === 'text' && (typeof value !== 'string' || value.length === 0)) throw new Error('[PENPOT PLUGIN] Value not valid: . Code: :characters');
+      this._characters = value;
     }
     get x() { return this._x; }
     set x(value) {
@@ -62,6 +67,8 @@ export function createFakePenpot(options = {}) {
       copy.y = this.y;
       copy.characters = this.characters;
       copy.fills = structuredClone(this.fills);
+      copy.strokes = structuredClone(this.strokes);
+      copy.borderRadius = this.borderRadius;
       copy.data = new Map(this.data);
       for (const child of this.children ?? []) copy.appendChild(child.clone());
       return copy;

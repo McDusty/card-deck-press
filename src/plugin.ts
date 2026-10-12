@@ -18,12 +18,15 @@ import { readSource, requireLocalSource, localSource, SOURCE_KEY } from './deck-
 import { deckFingerprint } from './deck-fingerprint';
 import { captureState, commitState, recoverState, requireRecovered, RECOVERY_KEY } from './deck-storage';
 import { artworkThumbnail } from './artwork-thumbnail';
+import { addRuling, resolveTemplateStyle } from './template-style';
+import { cloneTracked } from './output-clone';
 const deckSession = new DeckSession(penpot);
 const imageTargets = new ImageTargets();
 const csvImporter = new CsvImporter(penpot);
 let pdfOperation: { id: string; context: PageBinding; fingerprint: string; deadline: number } | null = null;
 let pdfSerial = 0;
 let sheetRead: { context: PageBinding; state: string } | null = null;
+let loadedCardsSnapshot: string | null = null;
 function pdfFingerprint(): string {
     const page = penpot.currentPage;
     if (!page) return '';
@@ -99,6 +102,7 @@ penpot.ui.open("Card Deck Press", "", {
 
 function loadCardsData() {
     const cards = penpot.currentPage ? readDeck(penpot.currentPage) : [];
+    loadedCardsSnapshot = penpot.currentPage?.getPluginData('cardsData') ?? '';
     sendUi({ type: 'CARDS_DATA', data: JSON.stringify(cards), rowIds: deckSession.loadRows(cards.length) });
 }
 
@@ -167,13 +171,14 @@ function selectArtwork(value: unknown) {
 async function createDeck(message: DeckEvent) {
     if (penpot.currentPage) {
         const { width, height } = resolveDeckSize(message.size, message.orientation, message.data);
+        const style = resolveTemplateStyle(message.templateStyle, message.size);
         const context = { ...deckSession.context };
-        const media = await penpot.uploadMediaData('Card Deck Press image placeholder.png', templatePlaceholder, 'image/png');
+        const media = style === 'title-image' ? await penpot.uploadMediaData('Card Deck Press image placeholder.png', templatePlaceholder, 'image/png') : null;
         if (!deckSession.matches(context)) throw new Error('The page changed. Return to an empty page and create the deck again.');
         const pageRoot = penpot.currentPage.root;
         if ('children' in pageRoot && pageRoot.children.length) throw new Error('The page must still be empty to create a deck.');
         const previousName = penpot.currentPage.name;
-        const created: Board[] = [];
+        const created: Shape[] = [];
         try {
             penpot.currentPage.name = message.name;
 
@@ -185,14 +190,16 @@ async function createDeck(message: DeckEvent) {
             front.name = "Front";
 
             const inside = penpot.createBoard();
+            front.appendChild(inside);
             inside.name = "inside";
-            inside.borderRadius = 50;
+            inside.borderRadius = 0;
+            inside.fills = [{ fillColor: '#FFFFFF', fillOpacity: 1 }];
 
             inside.strokes = [
                 {
                     strokeColor: '#000000',
                     strokeStyle: 'solid',
-                    strokeWidth: 12,
+                    strokeWidth: 3,
                     strokeAlignment: 'inner',
                 },
             ];
@@ -202,29 +209,30 @@ async function createDeck(message: DeckEvent) {
             inside.x = 0;
             inside.y = 0;
 
-            front.appendChild(inside);
+            if (style === 'ruled') addRuling(penpot, inside);
 
-            back = (front.clone() as Board);
-            created.push(back);
+            back = cloneTracked(penpot.currentPage, front, created) as Board;
             back.name = "Back";
             back.x += front.width + 100;
 
-            const title = penpot.createText('Card title');
-            if (!title) throw new Error('Could not create the title placeholder.');
-            title.name = '#title'; title.fontSize = String(Math.min(width, height) * 0.06);
-            title.growType = 'auto-height'; title.fills = [{ fillColor: '#173d33', fillOpacity: 1 }];
-            inside.appendChild(title); title.resize(width * 0.84, height * 0.1);
-            title.x = front.x + width * 0.08; title.y = front.y + height * 0.08;
+            if (media) {
+                const title = penpot.createText('Card title');
+                if (!title) throw new Error('Could not create the title placeholder.');
+                title.name = '#title'; title.fontSize = String(Math.min(width, height) * 0.06);
+                title.growType = 'auto-height'; title.fills = [{ fillColor: '#173d33', fillOpacity: 1 }];
+                inside.appendChild(title); title.resize(width * 0.84, height * 0.1);
+                title.x = front.x + width * 0.08; title.y = front.y + height * 0.08;
 
-            const image = penpot.createRectangle(); image.name = '#image';
-            image.fills = [{ fillImage: media, fillOpacity: 1 }];
-            inside.appendChild(image); image.resize(width * 0.84, height * 0.6);
-            image.x = front.x + width * 0.08; image.y = front.y + height * 0.25;
+                const image = penpot.createRectangle(); image.name = '#image';
+                image.fills = [{ fillImage: media, fillOpacity: 1 }];
+                inside.appendChild(image); image.resize(width * 0.84, height * 0.6);
+                image.x = front.x + width * 0.08; image.y = front.y + height * 0.25;
 
-            const backInside = back.children.find(shape => shape.name === 'inside') as Board;
-            const backImage = image.clone(); backImage.name = 'Image';
-            backInside.appendChild(backImage);
-            backImage.x = back.x + width * 0.08; backImage.y = back.y + height * 0.25;
+                const backInside = back.children.find(shape => shape.name === 'inside') as Board;
+                const backImage = cloneTracked(penpot.currentPage, image, created); backImage.name = 'Image';
+                backInside.appendChild(backImage);
+                backImage.x = back.x + width * 0.08; backImage.y = back.y + height * 0.25;
+            }
 
             penpot.closePlugin();
         } catch (error) {
@@ -410,6 +418,7 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             else if (message.type === 'csv-status') sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
             else {
                 const cards = message.type === 'csv-apply' ? csvImporter.apply(message.data) : csvImporter.restore(message.data);
+                loadedCardsSnapshot = penpot.currentPage?.getPluginData('cardsData') ?? '';
                 advanceSource();
                 sendUi({ type: 'CSV_APPLIED', data: cards, rowIds: deckSession.replaceRows(cards.length), changes: csvImporter.lastChange });
                 sourceStatus();
@@ -432,7 +441,14 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
             const cards: unknown = JSON.parse(message.data);
             if (!Array.isArray(cards) || cards.some(card => !card || typeof card !== 'object' || Array.isArray(card) || Object.values(card).some(value => typeof value !== 'string'))) throw new Error('Card data is invalid.');
             const rows = deckSession.validateRows(message.rowIds, cards);
+            if ((penpot.currentPage?.getPluginData('cardsData') ?? '') !== loadedCardsSnapshot) {
+                // Invalidate queued edits and image callbacks from the stale editor too.
+                advanceSource();
+                loadCardsData();
+                throw new Error('The saved cards changed outside this editor. The latest cards have been reloaded; your last edit was not saved.');
+            }
             penpot.currentPage?.setPluginData('cardsData', JSON.stringify(message.data));
+            loadedCardsSnapshot = penpot.currentPage?.getPluginData('cardsData') ?? '';
             penpot.currentPage?.setPluginData('csv-output-stale', 'true');
             deckSession.setRows(rows);
             imageTargets.retainRows(rows);
@@ -451,20 +467,44 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
         try {
             if (pdfLocked()) throw new Error('Wait for the PDF download to finish.');
             const request = parseForgeRequest(message.data);
+            if ((penpot.currentPage?.getPluginData('cardsData') ?? '') !== loadedCardsSnapshot) {
+                // Generation must obey the same saved-card baseline as manual
+                // editing, before replacing any previously generated output.
+                advanceSource();
+                throw new Error('The saved cards changed outside this editor. The latest cards have been reloaded. Review them before generating again; existing output was kept.');
+            }
             if (penpot.currentPage && readSource(penpot.currentPage).mode === 'google-sheet' && JSON.stringify(request.cardsData) !== JSON.stringify(readDeck(penpot.currentPage))) throw new Error('The linked deck changed. Pull Latest or reload the card list before generating.');
             const outputCards = cardsForOutput(request.cardsData, request.type);
             if (penpot.currentPage && !request.type.startsWith('backs-')) validateImportedFields(penpot.currentPage, outputCards);
-            if (isFaceMode(request.type)) {
-                const output = generateFrontOutput(penpot, outputCards, request.type, request.paper, request.cutMarks, request.cardsData);
-                penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
-                sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
-            } else {
-                const output = forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks, request);
-                penpot.currentPage?.setPluginData('outputSettings', JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks }));
-                if (request.type === 'printplay') sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
-                else sendUi({ type: 'OUTPUT_READY', data: null });
+            const page = penpot.currentPage;
+            if (!page) throw new Error('Open a Penpot page first.');
+            const previous = ['outputSettings', 'csv-output-stale'].map(key => ({ key, value: page.getPluginData(key) ?? '' }));
+            let output: Board;
+            try {
+                // Persist settings before generation can replace completed output.
+                // Both synchronous generators retain old output on build failure.
+                const settings = JSON.stringify({ type: request.type, paper: request.paper, cutMarks: request.cutMarks, paperOrientation: request.paperOrientation, gapMm: request.gapMm, bufferColor: request.bufferColor });
+                page.setPluginData('outputSettings', settings);
+                page.setPluginData('csv-output-stale', 'false');
+                if (page.getPluginData('outputSettings') !== settings || page.getPluginData('csv-output-stale') !== 'false') {
+                    throw new Error('Could not verify saved output settings. Existing output was kept.');
+                }
+                output = isFaceMode(request.type)
+                    ? generateFrontOutput(penpot, outputCards, request.type, request.paper, request.cutMarks, request.cardsData, request.paperOrientation, request.gapMm, request.bufferColor)
+                    : forgeLegacyCards(penpot, outputCards, request.type, request.cutMarks, request);
+            } catch (error) {
+                // A setter can throw after persisting; inspect and restore both keys.
+                for (const { key, value } of previous) {
+                    try { if ((page.getPluginData(key) ?? '') !== value) page.setPluginData(key, value); }
+                    catch { /* Check readback after attempting every restoration. */ }
+                }
+                if (previous.some(({ key, value }) => (page.getPluginData(key) ?? '') !== value)) {
+                    throw new Error(`${error instanceof Error ? error.message : 'Generation failed.'} Could not restore previous output settings; check them before generating again.`);
+                }
+                throw error;
             }
-            penpot.currentPage?.setPluginData('csv-output-stale', 'false');
+            if (isFaceMode(request.type) || request.type === 'printplay') sendUi({ type: 'FRONT_OUTPUT_READY', data: { sheets: output.children.length } });
+            else sendUi({ type: 'OUTPUT_READY', data: null });
             if (penpot.currentPage?.getPluginData('csv-import-metadata')) sendUi({ type: 'CSV_STATUS', data: csvImporter.status() });
         } catch (error) {
             sourceStatus();
