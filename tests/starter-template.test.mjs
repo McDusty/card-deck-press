@@ -11,6 +11,11 @@ test('new decks expose Title and Image fields with a real image fill and keep Ba
   const back = f.page.findShapes({ name: 'Back' })[0];
   const inside = front.children.find(shape => shape.name === 'inside');
   const backInside = back.children.find(shape => shape.name === 'inside');
+  for (const frame of [inside, backInside]) {
+    assert.equal(frame.borderRadius, 0);
+    assert.equal(frame.strokes[0].strokeColor, '#000000');
+    assert.equal(frame.strokes[0].strokeWidth, 3);
+  }
   const title = inside.children.find(shape => shape.name === '#title');
   const image = inside.children.find(shape => shape.name === '#image');
   assert.equal(title.parent, inside); assert.equal(image.parent, inside);

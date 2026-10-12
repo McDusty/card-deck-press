@@ -18,6 +18,18 @@ All dimensions below are **finished trim sizes**, without added bleed. Inches ar
 | Large square | 3.5 × 3.5 | 88.90 × 88.90 | 1050 × 1050 |
 | Business | 2 × 3.5 | 50.80 × 88.90 | 600 × 1050 |
 
+## Index cards
+
+Added October 12, 2026. These inch-based index-card presets extend the playing-card list above. Values below use portrait dimensions; index cards default to Landscape in Create Deck, which swaps width and height.
+
+| Preset | Inches | Millimeters | Pixels at 300 ppi |
+| --- | --- | --- | --- |
+| Index — 3 × 5 | 3 × 5 | 76.20 × 127.00 | 900 × 1500 |
+| Index — 4 × 6 | 4 × 6 | 101.60 × 152.40 | 1200 × 1800 |
+| Index — 5 × 8 | 5 × 8 | 127.00 × 203.20 | 1500 × 2400 |
+
+All new template styles have thin black borders. Blank and ruled styles omit the title and image placeholders. Automatic page layouts keep these dimensions with 5 mm margins. Page orientation can be Auto, Portrait, or Landscape; Auto chooses the orientation that fits the most cards in a regular grid. Single-card PDFs use the card's exact physical dimensions. Optional cutting buffers add space around cards without changing these trim sizes; see the [printing guide](printing-guide.md).
+
 ## What changed
 
 - Poker is 750 × 1050 px. Its original upstream 1039 px height was 11 px short.

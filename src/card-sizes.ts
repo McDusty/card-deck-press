@@ -4,6 +4,7 @@ export interface CardDimensions { width: number; height: number }
 export interface CardPreset extends CardDimensions {
     name: string;
     unit: 'inch' | 'mm';
+    category?: 'index';
 }
 export const PIXELS_PER_INCH = 300;
 const scale: Record<MeasurementUnit, number> = { px: 1, inch: PIXELS_PER_INCH, mm: PIXELS_PER_INCH / 25.4 };
@@ -14,8 +15,8 @@ export function formatDimensions(width: number, height: number, unit: Measuremen
     return `${format(width)} × ${format(height)} ${unit === 'inch' ? 'in' : unit}`;
 }
 
-// Rectangular trim sizes from MakePlayingCards' image-upload guide.
-// Other printers can use different sizes. See docs/card-size-audit.md.
+// Playing-card trim sizes from MakePlayingCards' image-upload guide, plus
+// conventional index-card sizes. See docs/card-size-audit.md.
 export const cardPresets: readonly CardPreset[] = [
     { name: 'Standard (Poker)', width: 2.5, height: 3.5, unit: 'inch' },
     { name: 'Bridge', width: 2.25, height: 3.5, unit: 'inch' },
@@ -28,7 +29,11 @@ export const cardPresets: readonly CardPreset[] = [
     { name: 'Small square', width: 2, height: 2, unit: 'inch' },
     { name: 'Large square', width: 3.5, height: 3.5, unit: 'inch' },
     { name: 'Business', width: 2, height: 3.5, unit: 'inch' },
+    { name: 'Index — 3 × 5', width: 3, height: 5, unit: 'inch', category: 'index' },
+    { name: 'Index — 4 × 6', width: 4, height: 6, unit: 'inch', category: 'index' },
+    { name: 'Index — 5 × 8', width: 5, height: 8, unit: 'inch', category: 'index' },
 ];
+export const isIndexCardSize = (size: string): boolean => /^\d+$/.test(size) && cardPresets[Number(size)]?.category === 'index';
 export const DEFAULT_CARD_SIZE = String(cardPresets.findIndex(preset => preset.name === 'Standard (Poker)'));
 export const cardSizes: readonly (readonly [string, number, number])[] = cardPresets.map(preset => [
     preset.name, toPixels(preset.width, preset.unit), toPixels(preset.height, preset.unit),

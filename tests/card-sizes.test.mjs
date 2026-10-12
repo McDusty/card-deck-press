@@ -19,7 +19,7 @@ test('every preset uses its exact physical dimensions without integer-pixel trun
   }
   assert.deepEqual(resolveDeckSize('3', 'portrait', null), { width: 825, height: 1425 });
   assert.deepEqual(resolveDeckSize('0', 'portrait', null), { width: 750, height: 1050 });
-  assert.equal(cardPresets.length, 11);
+  assert.equal(cardPresets.length, 14);
   assert.deepEqual(cardSizes[4], ['Medium', 735, 1185]);
 });
 

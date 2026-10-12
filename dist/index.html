@@ -51,7 +51,7 @@
               <select id="create-deck-size">
               </select>
             </div>
-            <div class="input-text"><label for="create-deck-orientation">Orientation</label>
+            <div class="input-text"><label for="create-deck-orientation">Card orientation</label>
               <select id="create-deck-orientation">
                 <option value="portrait">Portrait</option>
                 <option value="landscape">Landscape</option>
@@ -62,12 +62,20 @@
             <div class="input-text"><label for="create-deck-units">Measurements</label>
               <select id="create-deck-units"><option value="px">Pixels (px)</option><option value="inch">Inches</option><option value="mm">Millimeters (mm)</option></select>
             </div>
+            <div class="input-text"><label for="create-deck-style">Template style</label>
+              <select id="create-deck-style">
+                <option value="title-image">Title and image</option>
+                <option value="blank">Blank</option>
+                <option value="ruled">Ruled (writing lines)</option>
+              </select>
+            </div>
           </div>
           <div id="custom-card-size" class="row-input hidden">
             <div class="input-text"><label id="custom-width-label" for="custom-card-width">WIDTH (PX)</label><input id="custom-card-width" type="number" step="any" disabled /></div>
             <div class="input-text"><label id="custom-height-label" for="custom-card-height">HEIGHT (PX)</label><input id="custom-card-height" type="number" step="any" disabled /></div>
           </div>
           <p id="create-size-note" role="status"></p>
+          <p>All styles start with a thin black border. Blank and ruled cards have no title or image placeholders.</p>
           <p id="create-size-error" class="hidden" role="alert"></p>
           <div class="modal-buttons">
             <button class="btn-primary" type="submit">Create Deck</button>
@@ -148,7 +156,7 @@
             </div>
           </div>
         </div>
-        <p id="cards-fields-note" class="cards-fields-note" role="status">Card details come from the Front template in Penpot. Open Card Deck Press inside Penpot and add text layers such as #name or #rules to Front, then reopen the plugin to load those fields.</p>
+        <p id="cards-fields-note" class="cards-fields-note" role="status">Blank and ruled templates need only Quantity. To add card details, add text layers such as #name or #rules to the Front template in Penpot, then reopen the plugin to load those fields.</p>
         <div id="card-list" class="cards-list">
           <div id="cards-empty" class="cards-empty">
             <h3>No cards yet</h3>
@@ -259,11 +267,13 @@
               <select id="forge-type">
                 <optgroup label="Fronts only — no backs">
                   <option value="fronts-single">Single fronts (no backs)</option>
+                  <option value="fronts-auto">Fronts on pages (automatic fit)</option>
                   <option value="fronts-6">6 fronts per page (2 × 3)</option>
                   <option value="fronts-9">9 fronts per page (3 × 3)</option>
                 </optgroup>
                 <optgroup label="Backs only">
                   <option value="backs-single">Single shared back (no fronts)</option>
+                  <option value="backs-auto">Backs on pages (automatic fit)</option>
                   <option value="backs-6">6 backs per page (2 × 3)</option>
                   <option value="backs-9">9 backs per page (3 × 3)</option>
               </optgroup>
@@ -285,10 +295,31 @@
             <div class="input-text">
               <label for="forge-paper">PAPER</label>
               <select id="forge-paper">
-                <option value="letter">US Letter portrait</option>
-                <option value="a4">A4 portrait</option>
+                <option value="letter">US Letter</option>
+                <option value="a4">A4</option>
               </select>
             </div>
+            <div class="input-text"><label for="forge-paper-orientation">Page orientation</label>
+              <select id="forge-paper-orientation">
+                <option value="auto">Auto</option>
+                <option value="portrait">Portrait</option>
+                <option value="landscape">Landscape</option>
+              </select>
+            </div>
+          </div>
+          <div id="forge-buffer-options" class="hidden">
+            <div class="row-input">
+              <div class="input-text"><label for="forge-gap">Space between cards (mm)</label>
+                <input id="forge-gap" type="number" min="0" max="10" step="0.1" value="0" aria-describedby="forge-buffer-help">
+              </div>
+              <div class="input-text"><label for="forge-buffer-color">Buffer color</label>
+                <select id="forge-buffer-color"><option value="#FFFFFF">White</option><option value="#000000">Black</option><option value="custom">Custom color</option></select>
+              </div>
+              <div id="forge-buffer-custom-field" class="input-text hidden"><label for="forge-buffer-custom">Custom buffer color</label>
+                <input id="forge-buffer-custom" type="color" value="#FFFFFF">
+              </div>
+            </div>
+            <p id="forge-buffer-help">Optional: try 2 mm for cutting tolerance. Match the card edge color. Adds color around cards, not extended artwork. Larger spacing may fit fewer cards per page.</p>
           </div>
           <div id="forge-explain">
             <p id="forge-template-size"></p>
@@ -326,12 +357,14 @@
             <ol>
               <li><a href="#help-start">Quick start</a></li>
               <li><a href="#help-size">Create a deck and choose a size</a></li>
+              <li><a href="#help-index-cards">Make index cards</a></li>
               <li><a href="#help-template">Design your template</a></li>
               <li><a href="#help-edit">Edit cards</a></li>
               <li><a href="#help-csv">Import CSV or Google Sheets data</a></li>
               <li><a href="#help-artwork">Set up a template image</a></li>
               <li><a href="#help-backup">Update, export, and restore</a></li>
               <li><a href="#help-output">Choose an output layout</a></li>
+              <li><a href="#help-buffer">Add a cutting buffer</a></li>
               <li><a href="#help-print">Print, cut lines, and bleed</a></li>
               <li><a href="#help-trouble">Fix common problems</a></li>
             </ol>
@@ -340,11 +373,11 @@
             <section id="help-start" aria-labelledby="help-start-heading">
               <h2 id="help-start-heading">Quick start</h2>
               <ol>
-                <li>Open an <strong>empty Penpot page</strong>. In <strong>Create deck</strong>, choose a name, size, and orientation.</li>
-                <li>Click <strong>Create deck</strong>. The plugin creates <strong>Front</strong>, <strong>Back</strong>, and <strong>Artwork</strong> frames, then closes. Inside Front's <strong>inside</strong> frame, it adds a <code>#title</code> text layer and a black <code>#image</code> image placeholder. Back also has a black image placeholder inside its <strong>inside</strong> frame for your shared back design.</li>
+                <li>Open an <strong>empty Penpot page</strong>. In <strong>Create deck</strong>, choose a name, size, <strong>Card orientation</strong>, and <strong>Template style</strong>.</li>
+                <li>Click <strong>Create deck</strong>. The plugin creates <strong>Front</strong>, <strong>Back</strong>, and <strong>Artwork</strong> frames, then closes. Every new card has a thin black border. With <strong>Title and image</strong> style, inside Front's <strong>inside</strong> frame, it adds a <code>#title</code> text layer and a black <code>#image</code> image placeholder. Back also has a black image placeholder inside its <strong>inside</strong> frame for your shared back design.</li>
                 <li>Design Front. Name variable text or image layers with <code>#</code>, such as <code>#name</code>.</li>
-                <li>Reopen Card Deck Press. In <strong>Edit deck</strong>, use <strong>Add Card</strong> or <strong>Import CSV</strong>. New templates give each row <strong>Quantity</strong> (starting at 1), <strong>Title</strong>, and <strong>Image</strong>. CSV headers <code>title</code> and <code>image</code> map to the starter fields automatically.</li>
-                <li>Open <strong>Export</strong>, choose a layout, then click <strong>Generate Cards</strong>. Sheet layouts offer <strong>Download PDF</strong>.</li>
+                <li>Reopen Card Deck Press. In <strong>Edit deck</strong>, use <strong>Add Card</strong>, <strong>Import CSV</strong>, or <strong>Google Sheet</strong>. <strong>Title and image</strong> templates give each row <strong>Quantity</strong> (starting at 1), <strong>Title</strong>, and <strong>Image</strong>. Blank and ruled templates start with Quantity only. CSV headers <code>title</code> and <code>image</code> map to the starter fields automatically.</li>
+                <li>Open <strong>Export</strong>, choose a layout, then click <strong>Generate Cards</strong>. Single-card and page layouts offer <strong>Download PDF</strong>. For full sheets, start with <strong>Fronts on pages (automatic fit)</strong> and check the capacity preview.</li>
               </ol>
             </section>
             <section id="help-size" aria-labelledby="help-size-heading">
@@ -358,10 +391,23 @@
                   <tbody id="help-card-sizes"></tbody>
                 </table>
               </div>
-              <p>Choose <strong>Custom size</strong> to enter your own width and height. Each side must be between 1 and 12,000 px. Portrait places the longer side vertically; Landscape places it horizontally.</p>
+              <p>Choose <strong>Custom size</strong> to enter your own width and height. Each side must be between 1 and 12,000 px. <strong>Card orientation</strong> places the longer side vertically (Portrait) or horizontally (Landscape). <strong>Page orientation</strong> in Export turns the sheet without changing card dimensions.</p>
               <p>For exact <strong>70 × 120 mm Tarot</strong>, use Custom size. The Tarot preset is <strong>2.75 × 4.75 inches</strong>, or 69.85 × 120.65 mm.</p>
               <p>Changing a preset affects new decks. Existing templates keep their dimensions. <strong>Correct Poker Size</strong> fixes older poker templates and their original inset border, while preserving custom artwork. Generate cards again in Export afterward.</p>
               <p>These presets follow one printer's rectangular formats. Circle and hexagon formats are not included.</p>
+            </section>
+            <section id="help-index-cards" aria-labelledby="help-index-cards-heading">
+              <h2 id="help-index-cards-heading">Make index cards</h2>
+              <ol>
+                <li>In <strong>Create Deck</strong>, choose <strong>Index — 3 × 5</strong>, <strong>4 × 6</strong>, or <strong>5 × 8</strong>. These sizes are in inches. Index cards start in Landscape orientation; Portrait is also available.</li>
+                <li>Choose <strong>Blank</strong> for empty cards or <strong>Ruled (writing lines)</strong> for lines on both sides. All styles start with a thin, square black border. The writing lines are editable Penpot shapes, spaced a quarter inch apart. Blank and ruled styles have no title or image placeholders.</li>
+                <li>Create the deck, reopen the plugin, and use <strong>Edit Deck → Add Card</strong>. Set Quantity to the number of cards you want on print pages. You can add variable text or images to Front later.</li>
+                <li>In <strong>Export</strong>, choose <strong>Single fronts</strong> for one card-sized PDF page per design, or <strong>Fronts on pages (automatic fit)</strong> for full sheets. Use the corresponding Backs option to print backs.</li>
+              </ol>
+              <p>Automatic fit keeps the card size. Set <strong>Page orientation</strong> to <strong>Auto</strong> to fit the most cards in a regular grid, or choose <strong>Portrait</strong> or <strong>Landscape</strong> yourself. On Letter, 3 × 5 cards fit four per page, 4 × 6 fit two, and 5 × 8 fit two. On A4, 5 × 8 cards fit one per page because of the 5 mm print margins. These counts use Auto page orientation and 0 mm spacing. The preview shows the chosen orientation and page count before generation.</p>
+              <p>Six-up and nine-up choices appear only when that card face fits the selected paper, page orientation, and spacing. If a saved grid no longer fits, Export switches to automatic fit. Its menu label shows how many cards fit per page.</p>
+              <p>For extra cutting tolerance, see <a href="#help-buffer">Add a cutting buffer</a>. Larger spacing can reduce the cards per page.</p>
+              <p>Click <strong>Generate Cards → Download PDF</strong>, then print at <strong>Actual Size / 100%</strong>. Single-card layouts include each design once; page layouts repeat Quantity. Changing template style affects new decks only.</p>
             </section>
             <section id="help-template" aria-labelledby="help-template-heading">
               <h2 id="help-template-heading">Design your template</h2>
@@ -370,7 +416,7 @@
                 <li><strong>Back:</strong> one shared back design. It has no per-card variable fields.</li>
                 <li><strong>Artwork:</strong> the central place for images used by your cards.</li>
               </ul>
-              <p>Layers without a <code>#</code> name stay the same on every card. Give each variable layer a distinct name, such as <code>#name</code>, <code>#rules</code>, or <code>#art</code>.</p>
+              <p>Layers without a <code>#</code> name stay the same on every card. Give different fields distinct names, such as <code>#name</code>, <code>#rules</code>, or <code>#art</code>. To repeat one value on the same card, reuse its name on layers of the same type. Do not mix text and image layers under one name.</p>
               <p>Use a <strong>text layer</strong> for text fields. For image fields, use a <strong>rectangle with one image fill</strong>. Design its size and crop in the template.</p>
               <p>See <a href="#help-artwork">Set up a template image</a> for step-by-step image setup and a CSV example.</p>
               <p>Fronts-only output needs Front. Backs-only output needs Back. Layouts that include both sides need both frames.</p>
@@ -388,10 +434,10 @@
                 <li><strong>Import CSV:</strong> preview spreadsheet data before replacing the card list.</li>
               </ul>
               <p><strong>Example:</strong> add one Healing card and set Quantity to <strong>10</strong>. Print sheets include ten copies without needing ten rows. Editing the row updates every copy the next time you generate cards.</p>
-              <p>Quantities repeat cards in six-up, nine-up, back sheets, and fold-over layouts. Single-card, Standard, and Tabletop layouts include each nonzero design once. Older cards without a quantity count as 1.</p>
+              <p>Quantities repeat cards in automatic pages, six-up, nine-up, back sheets, and fold-over layouts. Single-card, Standard, and Tabletop layouts include each nonzero design once. Older cards without a quantity count as 1.</p>
               <p>Changing Penpot pages reloads the editor for the new page. Image uploads stay attached to their original card; uploads for a removed card or a previous page are discarded.</p>
-              <p>Text fields support multiple lines. In local mode after a CSV import, you can also edit <strong>Card ID</strong>. Keep IDs unique when preparing another import. The CSV <code>quantity</code> column uses the same Quantity field.</p>
-              <p>Card edits are saved on the Penpot page. When you are ready, open the <strong>Export tab</strong> at the top and click <strong>Generate Cards</strong>. Repeat this after editing cards to update the output.</p>
+              <p>Text fields support multiple lines. Clearing a text value renders it blank in generated cards; it does not leave the template placeholder visible. In local mode after a CSV import, you can also edit <strong>Card ID</strong>. Keep IDs unique when preparing another import. The CSV <code>quantity</code> column uses the same Quantity field.</p>
+              <p>Card edits are saved on the Penpot page. If the saved cards change outside this editor, the plugin reloads the newer cards and tells you the last edit was not saved. Review the rows before re-entering that edit. When you are ready, open the <strong>Export tab</strong> at the top and click <strong>Generate Cards</strong>. Repeat this after editing cards to update the output.</p>
             </section>
             <section id="help-csv" aria-labelledby="help-csv-heading">
               <h2 id="help-csv-heading">Import CSV or Google Sheets data</h2>
@@ -421,7 +467,7 @@
                   <tbody>
                     <tr><th scope="row"><code>card_id</code></th><td>A unique, nonblank ID for every row. Keep it stable across updates. <code>001</code> stays text.</td></tr>
                     <tr><th scope="row"><code>quantity</code></th><td>Optional. Defaults to 1 if the column is absent. Whole numbers 0–100; 0 excludes a card from output. A blank cell in a mapped quantity column is an error.</td></tr>
-                    <tr><th scope="row">Text fields</th><td>Text, including Unicode, commas, quotes, and line breaks. Quote CSV cells that contain commas or line breaks.</td></tr>
+                    <tr><th scope="row">Text fields</th><td>Text, including Unicode, commas, quotes, and line breaks. A blank mapped cell clears the text. Quote CSV cells that contain commas or line breaks.</td></tr>
                     <tr><th scope="row">Image fields</th><td>An exact Artwork image name or path. A blank mapped cell clears the image.</td></tr>
                   </tbody>
                 </table>
@@ -439,9 +485,9 @@ Second line",dragon.png
               <h2 id="help-artwork-heading">Set up a template image</h2>
               <h3>Create an image placeholder in Front</h3>
               <ol>
-                <li>Inside <strong>Front</strong>, draw a <strong>rectangle</strong> where each card's image should appear.</li>
+                <li>Inside <strong>Front → inside</strong>, draw a <strong>rectangle</strong> where each card's image should appear.</li>
                 <li>Give the rectangle <strong>one image fill</strong> using a sample image.</li>
-                <li>Name the rectangle after the spreadsheet column containing your image filenames, with <code>#</code> at the start. For example, an <code>art</code> column uses a rectangle named <code>#art</code>; an <code>illustration</code> column uses <code>#illustration</code>. Each variable layer needs a unique name.</li>
+                <li>Name the rectangle after the spreadsheet column containing your image filenames, with <code>#</code> at the start. For example, an <code>art</code> column uses a rectangle named <code>#art</code>; an <code>illustration</code> column uses <code>#illustration</code>. Use distinct names for different image fields. Reuse the same name only when both image placeholders should show the same image.</li>
                 <li>Set the rectangle's size and image crop in Penpot.</li>
                 <li>Reopen Card Deck Press. <strong>Edit Deck</strong> now shows a column with your chosen name, such as <strong>art</strong> or <strong>illustration</strong>.</li>
               </ol>
@@ -482,7 +528,7 @@ Second line",dragon.png
             <section id="help-output" aria-labelledby="help-output-heading">
               <h2 id="help-output-heading">Choose an output layout</h2>
               <p>Open <strong>Export → Output Layout</strong> to choose what to generate.</p>
-              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Single-card, six-up, nine-up, and Print and Play layouts offer <strong>Download PDF</strong> once generation succeeds. Standard and Tabletop boards can be exported through Penpot.</p>
+              <p>Choose your layout, paper size, and cut lines, then click <strong>Generate Cards</strong>. Single-card, automatic-page, six-up, nine-up, and Print and Play layouts offer <strong>Download PDF</strong> once generation succeeds. Standard and Tabletop boards can be exported through Penpot.</p>
               <p>Switching tabs keeps your output settings and a ready PDF. Editing cards, importing data, or changing output settings requires generating the output again. Use <strong>Back to Edit Deck</strong> or the top tab to return to your cards.</p>
               <div class="help-table-wrap">
                 <table>
@@ -490,6 +536,7 @@ Second line",dragon.png
                   <thead><tr><th scope="col">Layout</th><th scope="col">Result</th></tr></thead>
                   <tbody>
                     <tr><th scope="row">Single fronts</th><td>One separate front board for each included design. No backs.</td></tr>
+                    <tr><th scope="row">Fronts / Backs on pages (automatic fit)</th><td>A full-size grid on Letter or A4. Uses your chosen page orientation (Auto, Portrait, or Landscape) and repeats Quantity. Works with index cards and other card sizes.</td></tr>
                     <tr><th scope="row">6 fronts / 9 fronts</th><td>Fronts only, in a 2 × 3 or 3 × 3 grid. Quantities repeat cards.</td></tr>
                     <tr><th scope="row">Single shared back</th><td>One back board. No fronts.</td></tr>
                     <tr><th scope="row">6 backs / 9 backs</th><td>The shared back repeated for the deck's printed-copy count.</td></tr>
@@ -503,17 +550,33 @@ Second line",dragon.png
               <p><strong>Quantity 0</strong> excludes a card and its artwork requirements from every layout. Single-front, Standard, and Tabletop layouts include each nonzero design once. Print sheets repeat copies consecutively, in card-list order.</p>
               <p>Fronts Output and Backs Output are independent: generating one keeps the other. A successful run replaces its own previous output. Standard, fold-over, and Tabletop modes share their own generated Output frame. Only output owned by this deck is replaced, after the new output completes. Older unclaimed frames named Output are kept; remove them yourself if they are no longer needed. A failed run keeps the last completed output.</p>
             </section>
+            <section id="help-buffer" aria-labelledby="help-buffer-heading">
+              <h2 id="help-buffer-heading">Add a cutting buffer</h2>
+              <p>A buffer adds solid color around cards to make small cutting errors less visible. Match it to the color at your card edges.</p>
+              <ol>
+                <li>In <strong>Export</strong>, choose a page layout. For a full sheet of separate cards, use <strong>Fronts on pages (automatic fit)</strong> or its Backs equivalent.</li>
+                <li>Set <strong>Space between cards (mm)</strong>. The default is <strong>0</strong>; try <strong>2</strong>. The range is 0–10 mm.</li>
+                <li>Choose <strong>Buffer color → White, Black, or Custom color</strong>. For Custom color, use the color picker. Color controls become available when spacing is greater than 0.</li>
+                <li>Check the updated cards-per-page preview. Cards keep their full size; larger buffers may need more pages.</li>
+                <li>Choose <strong>Cut lines → Yes</strong> if you want trim guides. Click <strong>Generate Cards</strong>, then <strong>Download PDF</strong>.</li>
+              </ol>
+              <p>With 2 mm spacing, each facing card edge gets 1 mm of colored tolerance. The outer cards also get a 1 mm buffer, inside the print margins. Trim along both card edges to remove the gap and keep the finished card size.</p>
+              <p><strong>Example:</strong> portrait Poker cards fit nine per Letter page with 0 mm spacing. With 2 mm spacing and Auto page orientation, automatic fit places eight per page. A4 still fits nine.</p>
+              <p>Six-up and nine-up options disappear when they no longer fit. If a saved grid no longer fits, Export switches to automatic fit. Reduce spacing or change paper or page orientation to make a fixed grid available again.</p>
+              <p><strong>Print and play (fold-over)</strong> adds the buffer around each joined front/back pair; it keeps the fold joined. Single-card, Standard, and Tabletop Simulator layouts do not use this buffer.</p>
+              <p>This is solid color, not extended artwork bleed. If artwork reaches the card edge, a solid buffer cannot reproduce that artwork. Templates and saved card values stay unchanged.</p>
+            </section>
             <section id="help-print" aria-labelledby="help-print-heading">
               <h2 id="help-print-heading">Print, cut lines, and bleed</h2>
               <ul>
-                <li><strong>Paper:</strong> six-up and nine-up sheets default to US Letter portrait. A4 is also available.</li>
-                <li><strong>Spacing:</strong> sheets use 5 mm margins and no gaps between cards.</li>
-                <li><strong>Cut lines:</strong> default to Yes for sheets. Each shared card edge gets one straight line. Switch them off if you prefer.</li>
-                <li><strong>Card size:</strong> cards keep the template dimensions. If the selected grid does not fit, choose another size or layout.</li>
+                <li><strong>Paper:</strong> choose US Letter or A4. Set Page orientation to Auto, Portrait, or Landscape for automatic-fit, six-up, and nine-up pages. Auto chooses the larger grid for automatic fit, or prefers portrait when a fixed grid fits both ways.</li>
+                <li><strong>Spacing:</strong> automatic-fit, six-up, and nine-up sheets use 5 mm margins and default to 0 mm spacing. Add optional spacing and color with <a href="#help-buffer">a cutting buffer</a>.</li>
+                <li><strong>Cut lines:</strong> at 0 mm spacing, each shared card edge gets one straight line. With spacing, each gap has a line on both sides. Trim away the gap. Switch cut lines off if you prefer.</li>
+                <li><strong>Card size:</strong> cards keep the template dimensions. Six-up and nine-up appear only when they fit the current card size, paper, page orientation, and spacing. Use automatic fit, reduce spacing, or change page orientation when needed. Cards are never shrunk to fit.</li>
               </ul>
-              <p>After generation in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains generated pages in order. Single-card pages use the template's physical print size. Six-up and nine-up sheets use Letter or A4; Print and Play uses A4 in the generated orientation.</p>
+              <p>After generation in <strong>Export</strong>, click <strong>Download PDF</strong>. It contains generated pages in order. Single-card pages use the template's physical print size. Automatic, six-up, and nine-up sheets use Letter or A4; Print and Play uses A4 in the generated orientation.</p>
               <p>Print the PDF at <strong>Actual Size / 100%</strong>. Turn off Fit to Page. Measure a test card before printing the whole deck.</p>
-              <p>Editing cards while a PDF is being prepared cancels that download. Generate cards again to download the updated deck. Sheets are processed one at a time to reduce memory use. Very large files are stopped with a size error; reduce quantities or export a smaller selection of cards.</p>
+              <p>Editing cards while a PDF is being prepared cancels that download. Generate cards again to download the updated deck. Sheets are processed one at a time to reduce memory use. Very large files are stopped with a size error; reduce quantities or set Quantity to 0 for designs you do not want in that run.</p>
               <p>PDF sheets contain 300-ppi images. For single-card images, use Penpot's export controls. Automatic PNG ZIP downloads are not available yet.</p>
               <p><strong>Bleed</strong> is artwork extending beyond the final cut edge. Card Deck Press's preset frames are the finished size and do not add a printer-specific bleed area. Use your printer's separate requirements when preparing commercial files.</p>
               <p>Keep important text and symbols away from the card edge so cutting differences do not remove them.</p>
@@ -525,8 +588,12 @@ Second line",dragon.png
                 <dt>A template field is missing</dt><dd>Check its <code>#</code> name and layer type. Image fields need a rectangle with one image fill.</dd>
                 <dt>CSV Apply is disabled</dt><dd>Read the errors. Check IDs, quantities, column mapping, and exact artwork names. Then refresh the preview.</dd>
                 <dt>The deck changed after preview</dt><dd>Choose Check again to review the preview before applying. If the sheet needs to be read again, cancel the review and use Pull Latest.</dd>
-                <dt>Cards do not fit the sheet</dt><dd>Choose a compatible card size or layout, or use single cards. Large and Tarot cards may not fit a three-row sheet.</dd>
-                <dt>The PDF button is missing</dt><dd>Select single fronts, a single shared back, six-up, nine-up, or Print and Play in Export and click Generate Cards first.</dd>
+                <dt>Cards do not fit the sheet</dt><dd>Use automatic fit, reduce spacing, change paper or page orientation, or use single cards. Large and Tarot cards may not fit a three-row grid. Unavailable fixed grids are hidden.</dd>
+                <dt>My nine-up choice disappeared after adding a buffer</dt><dd>The cards plus spacing no longer fit. Use automatic fit or reduce spacing. For portrait Poker on Letter, 2 mm spacing gives eight cards per page with Auto page orientation.</dd>
+                <dt>I cannot choose a buffer color</dt><dd>Choose a page layout and set Space between cards above 0. Then choose White, Black, or Custom color.</dd>
+                <dt>The saved cards changed outside this editor</dt><dd>The newer cards were preserved and reloaded. Review the current rows, then re-enter your last edit if needed.</dd>
+                <dt>A blank title shows a characters error</dt><dd>Blank text is supported in the current build. Close and reopen the plugin to load the update, then generate again. Saved blank values stay blank.</dd>
+                <dt>The PDF button is missing</dt><dd>Select single fronts, a single shared back, automatic pages, six-up, nine-up, or Print and Play in Export and click Generate Cards first.</dd>
                 <dt>Printed cards are the wrong size</dt><dd>Check the template dimensions and print scaling. A PNG's pixel count alone does not set its physical print size; use the sheet PDF for physical page sizing.</dd>
                 <dt>Changes do not show in output</dt><dd>Generate cards again in Export after editing card data, the template, or artwork. Reopen the plugin after a local plugin rebuild.</dd>
               </dl>

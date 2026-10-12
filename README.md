@@ -29,6 +29,14 @@ Previously named **Card Forge Upgraded**. The repository and hosted URL are now 
 
 See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/create-a-plugin/#27-step-7-load-the-plugin-in-penpot). To work on the code, use the separate [local development setup](#develop-locally) below.
 
+## User guides
+
+- [Get started](#getting-started): create templates, add cards, and generate output.
+- [Printing guide](docs/printing-guide.md): card sizes, page layouts, cutting buffers, and PDF printing.
+- [Set up a template image](#set-up-a-template-image): name fields and choose reusable artwork.
+- [CSV imports](#csv-imports-and-deck-updates) and [Google Sheets](#google-sheets-connections): manage card data.
+- **Help tab:** the same workflow inside the plugin, with a table of contents.
+
 ## What changed from the original
 
 | Area | Changes in this fork |
@@ -38,9 +46,9 @@ See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/
 | Deck data | CSV import and direct Google Sheets links with column mapping, validation, reviewed updates, and stable card IDs. |
 | Card quantities | A Quantity field lets one Healing row produce ten printed copies. CSV imports recognize the `quantity` header. |
 | Artwork | A visible Artwork frame stores reusable images. Card rows accept image names or selections from Artwork. Uploads preserve filenames for reuse and CSV matching. |
-| Card sizes | Corrected Poker and Tarot dimensions, 11 rectangular presets, custom sizes, and a Pixels / Inches / Millimeters selector. |
-| Output layouts | Fronts only or backs only, as individual cards or six-up and nine-up sheets. Original Standard, fold-over Print and Play, and Tabletop layouts remain available. |
-| Printing | US Letter by default for the new sheet layouts, optional A4, cards placed edge to edge, single shared cut lines, and physically sized PDF downloads. |
+| Card sizes | Corrected Poker and Tarot dimensions, 14 rectangular presets including 3 × 5, 4 × 6, and 5 × 8 index cards, custom sizes, and a Pixels / Inches / Millimeters selector. |
+| Output layouts | Fronts only or backs only, as individual cards, automatic-fit pages, or six-up and nine-up sheets. Original Standard, fold-over Print and Play, and Tabletop layouts remain available. |
+| Printing | Letter or A4, page orientation, optional 0–10 mm colored cutting buffers, guides at the trim edges, and physically sized PDF downloads. |
 | Help | One scrollable guide with a table of contents, including CSV headers, quantities, image template setup, and printing. |
 | Data protection | Generation replaces only the output owned by that layout. Failed replacements preserve completed output; stale uploads and downloads are rejected after context changes. |
 | Development | Tilt setup, locked dependencies, compiler checks, and automated import, generation, and export tests. |
@@ -60,12 +68,18 @@ The updated interface follows a clear sequence: **Create Deck → Edit Deck → 
 
 ## Getting started
 
-1. On an empty Penpot page, open **Create Deck**. Choose a name, card size, and orientation. Creation adds **Front**, **Back**, and **Artwork** frames, then closes the plugin. Front's **inside** frame starts with a `#title` text layer and a black `#image` image placeholder. Back also has a black image placeholder inside its **inside** frame for your shared back design.
-2. Design your templates in Penpot. Keep the Front and Back frame names and dimensions. Name variable layers after your data columns, with a `#` prefix: `name` → `#name`.
-3. Reopen the plugin and use **Edit Deck** to add cards manually, import CSV, or connect a Google Sheet. New templates give each row **Quantity** (starting at 1), **Title**, and **Image**. CSV headers `title` and `image` map to these starter fields automatically. Set quantities for designs you want to print more than once.
-4. Open **Export**, select a layout, and click **Generate Cards**. Single-card, six-up, nine-up, and fold-over layouts offer **Download PDF**. Export individual boards through Penpot.
+1. Open an **empty Penpot page**, then launch Card Deck Press.
+2. In **Create Deck**, choose the deck name, card size, **Card orientation**, and **Template style**. Click **Create Deck**. The plugin creates Front, Back, and Artwork, then closes.
+3. Design the templates in Penpot. Keep their frame names and dimensions. Variable layers use a `#` prefix matching your data column: `title` → `#title`.
+4. Reopen the plugin. In **Edit Deck**, choose **Add Card**, **Import CSV**, or **Google Sheet**. Set **Quantity** for repeated printed copies.
+5. In **Export**, choose **Single fronts** for individual card-sized pages, or **Fronts on pages (automatic fit)** for full sheets. For sheets, choose paper, page orientation, optional spacing and buffer color, and cut lines. Check the capacity preview.
+6. Click **Generate Cards**, then **Download PDF**. Print at **Actual Size / 100%**.
 
-The **Back** is a shared design and does not support variable fields. The in-plugin **Help** tab contains the full workflow.
+**Title and image** style starts with `#title` and a black `#image` placeholder inside Front's **inside** frame. Each row has Quantity, Title, and Image. CSV headers `title` and `image` map to these fields. Back has a static image placeholder for your shared design.
+
+**Blank** and **Ruled (writing lines)** styles start with Quantity only. All new templates have a thin black border. The Back design is shared by every card and does not support per-card variables.
+
+Use the [printing guide](docs/printing-guide.md) for index cards, Tarot, cutting buffers, and choosing the right layout.
 
 ## CSV imports and deck updates
 
@@ -88,6 +102,8 @@ This example expects a text layer named `#name` and an image placeholder named `
 - **Export for spreadsheets:** also downloads a CSV, but adds a leading tab to values a spreadsheet might interpret as formulas, such as `+2 healing`. Use this as a viewing copy. The added tabs change those values, so use **Export CSV** for reimporting. Spreadsheet applications may handle this protection differently.
 - **Restore Previous State:** restore one saved card-list, mapping, output-settings, and data-source snapshot after confirming the destination mode. This does not restore artwork or template edits, or regenerate output.
 
+A blank mapped text or image cell clears that field in generated cards. An unmapped field keeps its template content. Text cleared manually also renders blank.
+
 Quoted commas, escaped quotes, Unicode, and multiline text are supported. Limits are **2 MiB per CSV, 100 columns, 500 records, and 1,000 printed copies**.
 
 ## Google Sheets connections
@@ -109,9 +125,9 @@ An unchanged refresh updates its last-applied time without replacing the meaning
 
 ## Set up a template image
 
-1. Inside **Front**, draw a rectangle where the variable image should appear.
+1. Inside **Front → inside**, draw a rectangle where the variable image should appear.
 2. Give it **one image fill** using a sample image. Set its size and crop in Penpot.
-3. Name it after the CSV column containing image filenames, with `#` at the start. An `art` column uses `#art`; an `illustration` column uses `#illustration`. Each variable layer needs a unique name.
+3. Name it after the CSV column containing image filenames, with `#` at the start. An `art` column uses `#art`; an `illustration` column uses `#illustration`. Use distinct names for different fields. To repeat the same value, reuse the name on layers of the same type; do not mix text and image layers under one name.
 4. Put source images in **Artwork**. In the import view, **Add artwork images** uploads a batch and names each image rectangle after its filename. You can also place and name image rectangles yourself.
 5. Enter the image name in the CSV cell: for example, `healing.png`. Raster file extensions can be omitted from the CSV or Artwork layer name. Exact matches take priority; multiple fallback matches require a unique name or folder path. Apply the import, then generate cards in Export.
 
@@ -141,9 +157,9 @@ Pixels use a **300 ppi** convention: 300 pixels represent one printed inch. Chan
 | Poker | 750 × 1050 | 2.5 × 3.5 | 63.5 × 88.9 |
 | Tarot | 825 × 1425 | 2.75 × 4.75 | 69.85 × 120.65 |
 
-The rectangular preset list follows MakePlayingCards formats. The 2.45 × 3.95-inch format is called **Medium**. See the [card-size reference](docs/card-size-audit.md) for the full list and sources.
+The playing-card presets follow MakePlayingCards formats, alongside three index-card sizes. The 2.45 × 3.95-inch format is called **Medium**. See the [card-size reference](docs/card-size-audit.md) for the full list and sources.
 
-**Custom size** supports other dimensions, including fractional pixels, from 1 to 12,000 px per side. Orientation places the longer dimension horizontally or vertically. No bleed is added automatically.
+**Custom size** supports other dimensions, including fractional pixels, from 1 to 12,000 px per side. **Card orientation** places the longer dimension horizontally or vertically. **Page orientation**, chosen later in Export, turns the sheet without rotating or resizing the cards. No artwork bleed is added automatically.
 
 Older templates are not automatically resized. **Correct Poker Size** fixes the original short Poker template and its inset sample border in one Penpot undo step. Custom artwork keeps its size and position; regenerate output after correction.
 
@@ -152,6 +168,7 @@ Older templates are not automatically resized. **Correct Poker Size** fixes the 
 | Layout | Result |
 | --- | --- |
 | Single fronts | One front board per included design, without backs. |
+| Fronts / Backs on pages (automatic fit) | Full-size cards in the largest regular grid on Letter or A4, with Auto, Portrait, or Landscape page orientation. Quantities repeat cards. |
 | Six fronts | Fronts arranged in a 2 × 3 grid per sheet. |
 | Nine fronts | Fronts arranged in a 3 × 3 grid per sheet. |
 | Single shared back | One back board, without fronts. |
@@ -160,15 +177,53 @@ Older templates are not automatically resized. **Correct Poker Size** fixes the 
 | Print and Play | The original A4 fold-over layout with fronts and backs together. |
 | Tabletop | A 10 × 7 sheet with up to 69 designs and a shared back. |
 
-Six-up and nine-up sheets default to **US Letter portrait**, with A4 available. They use **5 mm margins and no gaps** between cards. Cut lines default to Yes and can be turned off. Adjacent cards share one straight cut line.
+### Index cards
 
-Cards retain their template dimensions. A layout that cannot fit reports an error instead of shrinking them. The final sheet contains only the remaining copies, in card-list order. Paper, layout, and cut-line settings are saved with the page.
+Choose **Index — 3 × 5**, **4 × 6**, or **5 × 8** in Create Deck. Sizes are in inches at 300 ppi. Index presets start in Landscape with Blank style; both settings remain editable.
+
+- **Blank:** white cards with a thin, square black border.
+- **Ruled:** the same border plus editable writing lines on both sides, a quarter inch apart.
+- **Title and image:** the existing starter fields. All new templates now use the simple black border.
+
+Blank and ruled templates start with Quantity only. Add a card in Edit Deck and set its quantity, or add variable layers to Front for personalized content. Existing decks keep their designs.
+
+Use **Single fronts** for a PDF page at the card's physical size. Use **Fronts on pages (automatic fit)** or **Backs on pages (automatic fit)** to fill Letter or A4 sheets at full size. Choose **Page orientation → Auto, Portrait, or Landscape**. Auto uses the largest regular grid for automatic-fit pages. The default is 5 mm margins and 0 mm spacing. With Auto page orientation and 0 mm spacing, Letter fits four 3 × 5 cards, two 4 × 6 cards, or two 5 × 8 cards per page. A4 fits only one 5 × 8 card within those margins. Page layouts repeat Quantity; single-card layouts include each design once.
+
+### Cutting buffers
+
+1. Choose a page layout in **Export**.
+2. Set **Space between cards (mm)**. The default is **0**; try **2** for a cutting buffer.
+3. Set **Buffer color** to **White**, **Black**, or **Custom color**. Match the card's edge color.
+4. Check the updated page capacity, then generate and download again.
+
+Spacing supports **0–10 mm**. Half that distance also surrounds the outer cards, within the print margins. With a 2 mm gap, each facing edge gets 1 mm of tolerance. Cut guides mark both card edges; trim away the gap to keep the finished card size.
+
+Buffers add solid color, **not artwork bleed**. Fold-over Print and Play keeps each front/back pair joined and adds buffer around the pair. Single cards, Standard, and Tabletop Simulator are unaffected.
+
+**Example:** portrait Poker cards fit nine per Letter page at 0 mm. At 2 mm with Auto page orientation, automatic fit chooses eight per page. A4 still fits nine. See the [capacity table and cutting steps](docs/printing-guide.md#cards-per-page).
+
+### Paper and PDF output
+
+Six-up and nine-up sheets default to **US Letter**, with A4 available. Page orientation offers **Auto**, **Portrait**, and **Landscape**; Auto prefers portrait when the fixed grid fits both ways. They use **5 mm margins** and default to **0 mm spacing**. Cut lines can be turned off. At 0 mm, adjacent cards share one straight cut line. With spacing, each gap has a trim line on both sides.
+
+Cards retain their template dimensions. Six-up and nine-up choices appear only when they fit the current face size, paper, page orientation, and spacing. If a saved grid stops fitting, Export switches to automatic fit. If no page layout fits, reduce spacing, change paper or page orientation, or use single cards. The final sheet contains only the remaining copies, in card-list order. Layout, paper, page orientation, spacing, buffer color, and cut-line settings are saved with the deck when you generate.
 
 Fronts and backs have separate output containers. Generating one preserves the other. Only recorded plugin-owned output is replaced; unrelated or older unclaimed Output frames are preserved.
 
-**Download PDF** is available after generating single fronts, a single shared back, six-up or nine-up sheets, or Print and Play fold-over pages. Single-card PDFs use one page per generated card at its template print size. Sheet PDFs use exact Letter or A4 pages; fold-over pages use A4 in the generated orientation. All PDFs contain 300-ppi raster images. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
+**Download PDF** is available after generating single fronts, a single shared back, automatic-fit, six-up or nine-up sheets, or Print and Play fold-over pages. Single-card PDFs use one page per generated card at its template print size. Sheet PDFs use exact Letter or A4 pages; fold-over pages use A4 in the generated orientation. All PDFs contain 300-ppi raster images. Print at **Actual Size / 100%**, with Fit to Page disabled. Editing cards requires regenerating output before downloading an updated PDF.
+
+## Common problems
+
+- **A six-up or nine-up option disappeared:** it does not fit the current settings. Use automatic fit or reduce spacing. Cards are never shrunk.
+- **Blank text fields:** clearing a value renders that field blank. Leaving a CSV column unmapped keeps the template's original content.
+- **The saved cards changed outside this editor:** the plugin preserves the newer data and reloads it. Review the current rows, then re-enter your last edit if needed.
+- **The PDF button disappeared:** changed data or export settings require **Generate Cards** again before downloading.
+- **Printed dimensions are wrong:** print the PDF at **Actual Size / 100%** with Fit to Page off. Measure one test card first.
+- **A new local update is missing:** wait for Tilt to show Ready, then close and reopen the localhost plugin. Local builds and the GitHub Pages installation are separate.
 
 ## Automatic deployment
+
+Pull requests targeting **main** run build and test checks without deploying.
 
 Every push to **main** runs the build and tests, then publishes the built `dist` folder through GitHub Actions. A failed build or test leaves the previous deployment in place. The workflow can also be run manually from the repository's **Actions** tab.
 
