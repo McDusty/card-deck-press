@@ -6,6 +6,7 @@ Use **Export → Fronts on pages (automatic fit)** to fill a sheet without chang
 
 ## Contents
 
+- [Print existing frames](#print-existing-frames)
 - [Choose card size and style](#choose-card-size-and-style)
 - [Prepare the card list](#prepare-the-card-list)
 - [Choose an export layout](#choose-an-export-layout)
@@ -13,6 +14,26 @@ Use **Export → Fronts on pages (automatic fit)** to fill a sheet without chang
 - [Cards per page](#cards-per-page)
 - [Download, print, and cut](#download-print-and-cut)
 - [Fix common problems](#fix-common-problems)
+
+## Print existing frames
+
+Use this when you already have individual cards or index cards on the Penpot canvas. No Card Deck Press template or data table is needed.
+
+1. Select the **card frames** you want to print.
+2. Open **Export** and choose **Print selected frames** using the tabs at the top.
+3. Choose **Letter** or **A4** and a page orientation. **Auto** compares both orientations.
+4. Set **Page margin (mm)** for all four edges. Default: **5 mm**; range: **0–50 mm**. Check your printer’s minimum margin. A zero margin needs borderless printing.
+5. Choose whether cards may rotate 90°, plus optional spacing, buffer color, and cut lines.
+6. Review the page count and layout preview, then click **Download PDF**.
+7. Print at **Actual Size / 100%**, with **Fit to Page off**.
+
+Mixed sizes are supported. The plugin tries several packing arrangements and may reorder cards to save paper. Cards never shrink: **1500 × 900 px prints at 5 × 3 inches**, using 300 pixels per inch. Larger margins or spacing can increase the number of pages. Colored buffers remain inside the chosen page margin.
+
+The preview shows frame names and positions for the first 12 pages. Every selected frame prints once. Quantity values and front/back pairing do not apply. Originals and generated output are unchanged; this mode downloads a PDF directly without creating sheet boards.
+
+Select up to **500 frames** at once. A selected child frame inside a selected parent is included only through that parent. Select card frames themselves, not an outer board containing the entire collection. Hidden or already rotated canvas frames are rejected; use the print rotation option instead. Frames that cannot fit produce a named error. Reduce margins/spacing or change paper/orientation, keeping within your printer’s limits.
+
+After changing the selection or artwork, use **Use current selection**. Changes during PDF creation cancel that download. If the file exceeds memory limits, print smaller selections.
 
 ## Choose card size and style
 

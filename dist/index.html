@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Card Deck Press</title>
   <script type="module" crossorigin src="./index.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-84MCktfr.css">
+  <link rel="stylesheet" crossorigin href="./assets/index-D9kSSm4J.css">
 </head>
 
 <body>
@@ -239,7 +239,41 @@
       </section>
     </div>
     <div id="tab-export" class="tab hidden" role="tabpanel" aria-labelledby="ts-export">
-      <div id="box-forge" class="box box-small">
+      <div class="export-source">
+        <div class="export-mode-tabs" role="tablist" aria-label="Export mode">
+          <button id="export-mode-deck" class="export-mode-tab" type="button" role="tab" aria-selected="true" aria-controls="box-forge" tabindex="0">Deck export</button>
+          <button id="export-mode-selection" class="export-mode-tab" type="button" role="tab" aria-selected="false" aria-controls="selected-print-form" tabindex="-1">Print selected frames</button>
+        </div>
+      </div>
+      <form id="selected-print-form" class="box selected-print hidden" role="tabpanel" aria-labelledby="export-mode-selection">
+        <h3>Print selected frames</h3>
+        <p>Select your card frames in Penpot. Mixed sizes are supported. Frames keep their size and artwork; placement may reorder them to save paper.</p>
+        <div class="row-input">
+          <div class="input-text"><label for="selected-print-paper">Paper</label><select id="selected-print-paper"><option value="letter">US Letter</option><option value="a4">A4</option></select></div>
+          <div class="input-text"><label for="selected-print-orientation">Page orientation</label><select id="selected-print-orientation"><option value="auto">Auto — best fit</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></div>
+        </div>
+        <div class="row-input">
+          <div class="input-text"><label for="selected-print-margin">Page margin (mm)</label><input id="selected-print-margin" type="number" min="0" max="50" step="0.1" value="5" required aria-describedby="selected-print-margin-help"></div>
+          <div class="input-text"><label for="selected-print-gap">Space between cards (mm)</label><input id="selected-print-gap" type="number" min="0" max="10" step="0.1" value="0" required></div>
+          <div class="input-text"><label for="selected-print-color">Buffer color</label><input id="selected-print-color" type="color" value="#FFFFFF" disabled></div>
+        </div>
+        <div class="selected-print-options">
+          <label><input id="selected-print-rotate" type="checkbox" checked> Allow rotating cards 90° to improve fit</label>
+          <label><input id="selected-print-cuts" type="checkbox" checked> Include cut lines</label>
+        </div>
+        <p id="selected-print-margin-help">Page margin leaves blank space on all four edges. Default: 5 mm. Check your printer’s minimum margin; 0 mm requires borderless printing.</p>
+        <p>Pixels use 300 ppi: a 1500 × 900 px frame prints at 5 × 3 inches. Buffers add solid color, not artwork bleed.</p>
+        <div class="action-bar"><div class="action-primary"><button id="selected-print-refresh" type="button"><span class="button-icon icon-refresh" aria-hidden="true"></span>Use current selection</button></div></div>
+        <p id="selected-print-summary" role="status"></p>
+        <p id="selected-print-error" role="alert"></p>
+        <p id="selected-print-status" role="status" aria-live="polite"></p>
+        <div id="selected-print-pages" aria-label="Print layout preview"></div>
+        <div class="modal-buttons"><div class="action-primary action-pair">
+          <button id="selected-print-cancel" type="button">Back to deck export</button>
+          <button id="selected-print-download" class="btn-primary" type="submit" disabled>Download PDF</button>
+        </div></div>
+      </form>
+      <div id="box-forge" class="box box-small" role="tabpanel" aria-labelledby="export-mode-deck">
         <div class="art">
           <img src="images/hammer.svg" />
         </div>
@@ -365,6 +399,7 @@
               <li><a href="#help-backup">Update, export, and restore</a></li>
               <li><a href="#help-output">Choose an output layout</a></li>
               <li><a href="#help-buffer">Add a cutting buffer</a></li>
+              <li><a href="#help-selected-print">Print existing card frames</a></li>
               <li><a href="#help-print">Print, cut lines, and bleed</a></li>
               <li><a href="#help-trouble">Fix common problems</a></li>
             </ol>
@@ -566,6 +601,23 @@ Second line",dragon.png
               <p><strong>Print and play (fold-over)</strong> adds the buffer around each joined front/back pair; it keeps the fold joined. Single-card, Standard, and Tabletop Simulator layouts do not use this buffer.</p>
               <p>This is solid color, not extended artwork bleed. If artwork reaches the card edge, a solid buffer cannot reproduce that artwork. Templates and saved card values stay unchanged.</p>
             </section>
+            <section id="help-selected-print" aria-labelledby="help-selected-print-heading">
+              <h2 id="help-selected-print-heading">Print existing card frames</h2>
+              <p>Already designed cards or index cards on the canvas? Print them directly, without creating a deck or importing rows.</p>
+              <ol>
+                <li>Select the card <strong>frames</strong> in Penpot.</li>
+                <li>Open <strong>Export</strong> and choose <strong>Print selected frames</strong> using the tabs at the top.</li>
+                <li>Choose Letter or A4 and page orientation. Auto compares both orientations.</li>
+                <li>Set <strong>Page margin (mm)</strong> for all four edges. Default: 5 mm; range: 0–50 mm. Check your printer’s minimum margin. Zero requires borderless printing.</li>
+                <li>Choose optional 90° rotation, spacing, buffer color, and cut lines. Check the layout preview and page count.</li>
+                <li>Click <strong>Download PDF</strong>. Print at <strong>Actual Size / 100%</strong>, with Fit to Page off.</li>
+              </ol>
+              <p>Mixed sizes are supported. The plugin tries several arrangements to save paper and may reorder cards. It never shrinks them: 1500 × 900 px prints at 5 × 3 inches, using 300 pixels per inch. Buffers stay inside the chosen margin.</p>
+              <p>Each frame prints once; Quantity and front/back pairing do not apply. Originals remain untouched. The preview shows names and positions for the first 12 pages. Up to 500 frames can be selected per run; large PDFs may require smaller selections.</p>
+              <p>Select the individual card frames, not an outer board holding the entire collection. Selected children inside a selected parent print only through that parent. Hidden or already rotated canvas frames need adjustment first. Use the print rotation option to rotate cards on the sheet.</p>
+              <p>If a frame cannot fit, try another orientation, paper size, or smaller margins/spacing within your printer’s limits. After editing artwork or changing selection, choose <strong>Use current selection</strong>. Changes during export cancel the download.</p>
+            </section>
+
             <section id="help-print" aria-labelledby="help-print-heading">
               <h2 id="help-print-heading">Print, cut lines, and bleed</h2>
               <ul>

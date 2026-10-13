@@ -48,6 +48,7 @@ See [Penpot's plugin installation instructions](https://help.penpot.app/plugins/
 | Artwork | A visible Artwork frame stores reusable images. Card rows accept image names or selections from Artwork. Uploads preserve filenames for reuse and CSV matching. |
 | Card sizes | Corrected Poker and Tarot dimensions, 14 rectangular presets including 3 × 5, 4 × 6, and 5 × 8 index cards, custom sizes, and a Pixels / Inches / Millimeters selector. |
 | Output layouts | Fronts only or backs only, as individual cards, automatic-fit pages, or six-up and nine-up sheets. Original Standard, fold-over Print and Play, and Tabletop layouts remain available. |
+| Selected frames | Print existing Penpot frames directly to a multi-page PDF. Mix card sizes, choose page margins, preview packing, and allow 90° rotation. Originals stay untouched. |
 | Printing | Letter or A4, page orientation, optional 0–10 mm colored cutting buffers, guides at the trim edges, and physically sized PDF downloads. |
 | Help | One scrollable guide with a table of contents, including CSV headers, quantities, image template setup, and printing. |
 | Data protection | Generation replaces only the output owned by that layout. Failed replacements preserve completed output; stale uploads and downloads are rejected after context changes. |
@@ -201,6 +202,22 @@ Spacing supports **0–10 mm**. Half that distance also surrounds the outer card
 Buffers add solid color, **not artwork bleed**. Fold-over Print and Play keeps each front/back pair joined and adds buffer around the pair. Single cards, Standard, and Tabletop Simulator are unaffected.
 
 **Example:** portrait Poker cards fit nine per Letter page at 0 mm. At 2 mm with Auto page orientation, automatic fit chooses eight per page. A4 still fits nine. See the [capacity table and cutting steps](docs/printing-guide.md#cards-per-page).
+
+### Print existing card frames
+
+Already designed individual cards in Penpot? No deck or spreadsheet is required.
+
+1. Select the card **frames** in Penpot.
+2. Open **Export → Print selected frames** using the tabs at the top.
+3. Choose Letter or A4, page orientation, and **Page margin (mm)**. The margin applies to all four edges; default **5 mm**, range **0–50 mm**. Use your printer’s minimum margin; 0 requires borderless printing.
+4. Choose optional rotation, spacing, buffer color, and cut lines. Check the layout preview and page count.
+5. Click **Download PDF**. Print at **Actual Size / 100%**, with Fit to Page off.
+
+The plugin tries several arrangements to reduce page count, including mixed card sizes. It may reorder cards. It keeps each frame at full size: **1500 × 900 px = 5 × 3 inches** at 300 ppi. Changing margins updates capacity; buffers stay inside the margin. The preview shows positions and names for the first 12 pages, not artwork thumbnails.
+
+Each selected frame prints once; deck Quantity does not apply. Originals and generated boards remain untouched. Select up to 500 frames per run. Nested selected frames print only as part of their selected parent. This mode does not pair fronts and backs or arrange duplex sheets.
+
+Oversized, hidden, or already rotated canvas frames need adjustment before printing. Print rotation is handled by **Allow rotating cards 90°**. If frames change during export, refresh with **Use current selection**. The plugin stops oversized PDFs; select fewer frames when prompted.
 
 ### Paper and PDF output
 

@@ -27,6 +27,8 @@ import { closeArtworkPicker } from './artwork-picker';
 import { ArtworkPreviews } from './artwork-previews';
 import { calculateFrontLayout } from './front-layout';
 import { updateLayoutChoices } from './layout-choices';
+import { initSelectedPrintUi } from './selected-print-ui';
+let selectedPrintUi: ReturnType<typeof initSelectedPrintUi> | undefined;
 let artworkAssets: ArtworkAsset[] = [];
 const artworkCells = new Map<string, ArtworkCell>();
 const artworkKey = (rowId: string, name: string) => JSON.stringify([rowId, name]);
@@ -77,6 +79,7 @@ function initMessageListener() {
       return;
     }
     if (message.type === 'PAGE_CONTEXT') {
+      selectedPrintUi?.reset();
       deckTools?.close();
       artworkPreviews.reset();
       setBusy(document.querySelector('#create-deck-frm button[type="submit"]'), false);
@@ -91,12 +94,14 @@ function initMessageListener() {
     }
     if (message.pageId !== pageBinding.pageId || message.session !== pageBinding.session) return;
     if (message.type === 'SOURCE_CONTEXT') {
+      selectedPrintUi?.reset();
       deckTools?.close();
       artworkPreviews.reset();
       pageBinding = { pageId: message.pageId, session: message.session, epoch: message.epoch };
       imageTargets.clear(); closeArtworkPicker(); sheetsUi?.contextChanged(); csvUi?.contextChanged(); reloadCardEntries(); return;
     }
     if (message.epoch !== pageBinding.epoch) return;
+    selectedPrintUi?.message(message);
     artworkPreviews.message(message.type, message.data, message.requestId);
     if (message.type === 'CSV_APPLIED') { rowIds = message.rowIds; imageTargets.clear(); }
     csvUi?.message(message.type, message.data, message.changes); sheetsUi?.message(message.type, message.data);
@@ -833,6 +838,7 @@ window.onload = (_event) => {
   initTabSelectors();
   initCreateDeck();
   initCards();
+  selectedPrintUi = initSelectedPrintUi((type, data, requestId) => sendMessage({ type, data, requestId }));
   csvUi = initCsvUi({
     context: () => pageBinding,
     send: (type, data, binding) => sendMessage({ type, data }, binding),

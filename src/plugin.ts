@@ -20,6 +20,8 @@ import { captureState, commitState, recoverState, requireRecovered, RECOVERY_KEY
 import { artworkThumbnail } from './artwork-thumbnail';
 import { addRuling, resolveTemplateStyle } from './template-style';
 import { cloneTracked } from './output-clone';
+import { SelectedFramesPrinter } from './selected-frames';
+const selectedPrinter = new SelectedFramesPrinter(penpot);
 const deckSession = new DeckSession(penpot);
 const imageTargets = new ImageTargets();
 const csvImporter = new CsvImporter(penpot);
@@ -44,6 +46,7 @@ function pdfLocked(): boolean {
     return Boolean(pdfOperation);
 }
 function advanceSource(): void {
+    selectedPrinter.reset();
     csvImporter.invalidate(); sheetRead = null; imageTargets.clear(); deckSession.advance();
     sendUi({ type: 'SOURCE_CONTEXT', data: deckSession.context });
 }
@@ -79,6 +82,7 @@ function loadPage() {
     sendUi({ type: 'OUTPUT_SETTINGS', data: safeSettings(settings) });
 }
 penpot.on('pagechange', () => {
+    selectedPrinter.reset();
     deckSession.changePage();
     csvImporter.invalidate(); sheetRead = null; pdfOperation = null;
     imageTargets.clear();
@@ -337,6 +341,30 @@ penpot.ui.onMessage((message: PluginUIEvent) => {
     if (message.type === 'load-page') {
         if (deckSession.context.pageId !== (penpot.currentPage?.id ?? null)) deckSession.changePage();
         loadPage(); return;
+    }
+    if (message.type.startsWith('selection-print-')) {
+        const context = deckSession.context;
+        const requestId = message.requestId;
+        try {
+            deckSession.require(message);
+            if (typeof requestId !== 'string' || !requestId || requestId.length > 100) throw new Error('Invalid print request. Reopen Export.');
+            if (message.type === 'selection-print-preview') {
+                sendUi({ type: 'SELECTION_PRINT_PREVIEW', data: selectedPrinter.preview(message.data), requestId }, context);
+            } else if (message.type === 'selection-print-export') {
+                void selectedPrinter.export(message.data, requestId, (current, total) => sendUi({ type: 'SELECTION_PRINT_PROGRESS', data: { current, total }, requestId }, context))
+                    .then(data => {
+                        if (!deckSession.matches(context)) throw new Error('The active page changed. Select frames again.');
+                        sendUi({ type: 'SELECTION_PRINT_IMAGES', data, requestId }, context);
+                    })
+                    .catch(error => sendUi({ type: 'SELECTION_PRINT_ERROR', data: error instanceof Error ? error.message : 'Could not render the selected frames.', requestId }, context));
+            } else if (message.type === 'selection-print-check') {
+                selectedPrinter.check(message.data, requestId);
+                sendUi({ type: 'SELECTION_PRINT_CHECKED', data: null, requestId }, context);
+            } else if (message.type === 'selection-print-finish') selectedPrinter.finish(requestId);
+        } catch (error) {
+            sendUi({ type: 'SELECTION_PRINT_ERROR', data: error instanceof Error ? error.message : 'Could not print the selected frames.', requestId }, context);
+        }
+        return;
     }
     if (message.type === 'artwork-thumbnail') {
         const context = deckSession.context;
